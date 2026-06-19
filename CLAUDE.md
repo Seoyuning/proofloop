@@ -71,7 +71,8 @@ The deployed Vercel project **must** have these set for all environments (Produc
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `GEMINI_API_KEY` (only if `/api/diagnose` or Gemini-backed routes are exercised)
+
+국내 5사 모델 키(`FRIENDLI_API_KEY`=LG EXAONE, `UPSTAGE_API_KEY`=Solar, `KT_API_KEY`=Mi:dm, `SKT_API_KEY`=A.X K1, `VARCO_API_KEY`=NC VARCO)는 선택 사항 — 없으면 해당 기능이 휴리스틱 폴백으로 동작한다. **외부 모델(Gemini 등)은 국내 AI 트랙 실격 사유라 코드에서 제거했다. 다시 추가하지 말 것.**
 
 After changing any `NEXT_PUBLIC_*` value you must **redeploy without build cache** — these values are inlined into the JS bundle at build time.
 

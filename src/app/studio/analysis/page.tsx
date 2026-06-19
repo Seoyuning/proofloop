@@ -1,10 +1,36 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useStudio } from "@/lib/studio-context";
 import { InfoBlock, SectionHeader } from "@/components/studio-ui";
+
+/** 질문 데이터가 아직 없을 때 보여주는 '예시' 미리보기 (실데이터가 쌓이면 교체됨) */
+const SAMPLE_CLUSTERS = [
+  {
+    q: "이차함수 표준형에서 꼭짓점이 왜 (p, q)예요?",
+    unit: "3단원 이차함수 · p.84",
+    freq: 12,
+    misconception: "p의 부호를 그대로 옮기는 실수",
+    action: "표준형→꼭짓점 변환 1문제 즉석 풀이",
+  },
+  {
+    q: "판별식 D<0이면 왜 실근이 없나요?",
+    unit: "2단원 이차방정식 · p.58",
+    freq: 8,
+    misconception: "판별식 부호와 근의 개수 관계 혼동",
+    action: "D 부호별 그래프 위치 비교 설명",
+  },
+  {
+    q: "완전제곱식 만들 때 더하고 빼는 게 헷갈려요",
+    unit: "3단원 이차함수 · p.80",
+    freq: 6,
+    misconception: "상수항 보정(±) 누락",
+    action: "단계별 완전제곱 절차 체크리스트 제공",
+  },
+];
 
 interface UploadedMaterial {
   id: string;
@@ -70,6 +96,7 @@ export default function TeacherAnalysisPage() {
 
   const seedBotIds = ["high-math-bisang", "middle-science-mirae", "high-korean-chunjae"];
   const isSeedData = seedBotIds.includes(currentBot.id);
+  const isEmpty = currentClusters.length === 0;
 
   return (
     <div className="space-y-4">
@@ -113,6 +140,39 @@ export default function TeacherAnalysisPage() {
           </div>
         </div>
       </header>
+
+      {/* 빈 상태 온보딩 — 데이터가 없을 때 시작 흐름 안내 */}
+      {isEmpty && (
+        <section className="app-panel rounded-[28px] p-5 sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🚀</span>
+                <p className="text-base font-semibold text-navy">3단계로 시작하기</p>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-navy/5 px-3 py-1.5 text-xs font-medium text-navy">
+                  <b className="text-teal">①</b> 반 만들기
+                </span>
+                <span className="text-muted/40">→</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-navy/5 px-3 py-1.5 text-xs font-medium text-navy">
+                  <b className="text-teal">②</b> 초대 코드로 학생 참여
+                </span>
+                <span className="text-muted/40">→</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-navy/5 px-3 py-1.5 text-xs font-medium text-navy">
+                  <b className="text-teal">③</b> 질문이 쌓이면 자동 분석
+                </span>
+              </div>
+            </div>
+            <Link
+              href="/studio/classes"
+              className="whitespace-nowrap rounded-full bg-navy px-5 py-3 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-teal"
+            >
+              반 만들러 가기 →
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* Tab switcher */}
       <div className="flex gap-2">
@@ -185,7 +245,11 @@ export default function TeacherAnalysisPage() {
                   : "학생이 실제로 어떤 질문을 반복하는지, 어떤 오개념으로 묶이는지 바로 확인합니다."}
               />
               <div className="flex items-center gap-2">
-                {isSeedData && <span className="rounded-full bg-orange/10 px-3 py-1 text-xs font-semibold text-orange">예시 데이터</span>}
+                {(isSeedData || isEmpty) && (
+                  <span className="whitespace-nowrap rounded-full bg-orange/10 px-3 py-1 text-xs font-semibold text-orange">
+                    {isSeedData ? "예시 데이터" : "예시 미리보기"}
+                  </span>
+                )}
                 <div className="rounded-[20px] border border-line bg-white px-4 py-3 text-sm text-muted">
                   클러스터 {currentClusters.length}개
                 </div>
@@ -193,28 +257,53 @@ export default function TeacherAnalysisPage() {
             </div>
 
             <div className="app-scroll mt-6 max-h-[600px] space-y-3 overflow-y-auto pr-1">
-              {currentClusters.map((cluster) => {
-                const section = currentBot.sections.find((s) => s.id === cluster.sectionId);
-                return (
-                  <div key={cluster.id} className="rounded-[22px] border border-line bg-white/72 p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <p className="text-base font-semibold text-navy">{cluster.representativeQuestion}</p>
-                        <p className="mt-1 text-sm text-muted">
-                          {section?.title ?? "단원 미지정"} / {section?.pages ?? ""}
-                        </p>
+              {isEmpty ? (
+                <>
+                  {SAMPLE_CLUSTERS.map((c) => (
+                    <div key={c.q} className="rounded-[22px] border border-dashed border-line bg-white/45 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-base font-semibold text-navy/75">{c.q}</p>
+                          <p className="mt-1 text-sm text-muted">{c.unit}</p>
+                        </div>
+                        <span className="whitespace-nowrap rounded-full bg-navy/40 px-3 py-1 text-xs font-medium text-white">
+                          {c.freq}회
+                        </span>
                       </div>
-                      <span className="rounded-full bg-navy px-3 py-1 text-xs font-medium text-white">
-                        {cluster.frequency}회
-                      </span>
+                      <div className="mt-4 grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
+                        <InfoBlock label="오개념 태그" value={c.misconception} />
+                        <InfoBlock label="교사용 액션" value={c.action} />
+                      </div>
                     </div>
-                    <div className="mt-4 grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
-                      <InfoBlock label="오개념 태그" value={cluster.misconception} />
-                      <InfoBlock label="교사용 액션" value={cluster.teacherAction} />
+                  ))}
+                  <p className="pt-1 text-center text-xs text-muted/60">
+                    위는 예시입니다. 실제 학생 질문이 쌓이면 이 자리에 자동으로 교체됩니다.
+                  </p>
+                </>
+              ) : (
+                currentClusters.map((cluster) => {
+                  const section = currentBot.sections.find((s) => s.id === cluster.sectionId);
+                  return (
+                    <div key={cluster.id} className="rounded-[22px] border border-line bg-white/72 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <p className="text-base font-semibold text-navy">{cluster.representativeQuestion}</p>
+                          <p className="mt-1 text-sm text-muted">
+                            {section?.title ?? "단원 미지정"} / {section?.pages ?? ""}
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-navy px-3 py-1 text-xs font-medium text-white">
+                          {cluster.frequency}회
+                        </span>
+                      </div>
+                      <div className="mt-4 grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
+                        <InfoBlock label="오개념 태그" value={cluster.misconception} />
+                        <InfoBlock label="교사용 액션" value={cluster.teacherAction} />
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              )}
             </div>
           </section>
 

@@ -8,6 +8,7 @@ import { SectionHeader } from "@/components/studio-ui";
 interface ClassInfo {
   id: string;
   name: string;
+  school: string | null;
   subject: string;
   grade: string;
   publisher: string;
@@ -43,6 +44,7 @@ export default function ClassesPage() {
 
   // Create form state
   const [formName, setFormName] = useState("");
+  const [formSchool, setFormSchool] = useState("");
   const [formGrade, setFormGrade] = useState("");
   const [formSubject, setFormSubject] = useState("");
   const [formPublisher, setFormPublisher] = useState("");
@@ -88,6 +90,7 @@ export default function ClassesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formName,
+          school: formSchool,
           grade: formGrade,
           subject: formSubject,
           publisher: formPublisher,
@@ -100,6 +103,7 @@ export default function ClassesPage() {
       } else {
         setShowCreate(false);
         setFormName("");
+        setFormSchool("");
         setFormGrade("");
         setFormSubject("");
         setFormPublisher("");
@@ -168,6 +172,10 @@ export default function ClassesPage() {
             <p className="mt-1 text-sm text-muted">반 정보와 사용할 교과서를 입력하세요.</p>
             <div className="mt-4 space-y-3">
               <label className="block">
+                <span className="mb-1 block text-sm font-medium text-navy">학교</span>
+                <input className="w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-teal" placeholder="예: 한빛고등학교" value={formSchool} onChange={(e) => setFormSchool(e.target.value)} required />
+              </label>
+              <label className="block">
                 <span className="mb-1 block text-sm font-medium text-navy">반 이름</span>
                 <input className="w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-sm outline-none focus:border-teal" placeholder="예: 1학년 3반" value={formName} onChange={(e) => setFormName(e.target.value)} required />
               </label>
@@ -231,7 +239,9 @@ export default function ClassesPage() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-base font-semibold text-navy">{cls.name}</p>
+                        <p className="text-base font-semibold text-navy">
+                          {cls.school ? `${cls.school} · ` : ""}{cls.name}
+                        </p>
                         <p className="mt-1 text-sm text-muted">{cls.grade} {cls.subject} · {cls.publisher} {cls.textbook_name}</p>
                       </div>
                       <span className="whitespace-nowrap rounded-full bg-navy px-3 py-1 text-xs font-medium text-white">

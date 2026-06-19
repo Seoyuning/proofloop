@@ -40,3 +40,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 대회 제출 서류·개인정보 동의서·참고자료 (공개 레포에 올리지 않음)
+/*.pdf
+*.hwp
+*.hwpx
+/seoryu/
+/reference_pdfs/
+/docs/제출서류_복붙시트.md

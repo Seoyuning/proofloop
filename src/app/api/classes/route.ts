@@ -80,6 +80,7 @@ export async function POST(request: Request) {
     .insert({
       teacher_id: user.id,
       name: body.name.trim(),
+      school: body.school?.trim() || null,
       subject: body.subject.trim(),
       grade: body.grade.trim(),
       publisher: body.publisher.trim(),

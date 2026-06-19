@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { analyzeWithOptionalGemini } from "@/lib/diagnosis";
+import { analyzeDiagnosis } from "@/lib/diagnosis";
 import { getPayloadValidationMessage } from "@/lib/payload-validation";
 import type { DiagnosisPayload } from "@/lib/types";
 
@@ -32,6 +32,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: validationMessage }, { status: 400 });
   }
 
-  const diagnosis = await analyzeWithOptionalGemini(body);
+  const diagnosis = await analyzeDiagnosis(body);
   return NextResponse.json(diagnosis);
 }

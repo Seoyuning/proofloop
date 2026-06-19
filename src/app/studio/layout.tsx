@@ -18,9 +18,34 @@ function SidebarMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-const studentNav = [
-  { href: "/studio/chat", label: "질문하기" },
-  { href: "/studio/mypage", label: "마이페이지" },
+interface NavItem {
+  href: string;
+  label: string;
+  icon: string;
+  badge?: string;
+}
+
+interface NavSection {
+  title: string;
+  items: NavItem[];
+}
+
+const studentNavSections: NavSection[] = [
+  {
+    title: "학습",
+    items: [
+      { href: "/studio/chat", label: "질문하기", icon: "💬" },
+      { href: "/studio/upload", label: "문제 사진 풀이", icon: "📸", badge: "Upstage" },
+      { href: "/studio/reasoning", label: "풀이 채점", icon: "✍️", badge: "EXAONE" },
+      { href: "/studio/visual", label: "개념 시각화", icon: "🎨", badge: "VARCO" },
+    ],
+  },
+  {
+    title: "내 정보",
+    items: [
+      { href: "/studio/mypage", label: "마이페이지", icon: "👤" },
+    ],
+  },
 ];
 
 function JoinClassWidget() {
@@ -185,11 +210,36 @@ function StudentSessionList() {
   );
 }
 
-const teacherNav = [
-  { href: "/studio/analysis", label: "질문 분석" },
-  { href: "/studio/generate", label: "수업 도구" },
-  { href: "/studio/classes", label: "반 관리" },
-  { href: "/studio/mypage", label: "마이페이지" },
+const teacherNavSections: NavSection[] = [
+  {
+    title: "분석",
+    items: [
+      { href: "/studio/analysis", label: "질문 분석", icon: "📊" },
+      { href: "/studio/semester-report", label: "학기 리포트", icon: "📅", badge: "Mi:dm 128K" },
+      { href: "/studio/class-pattern", label: "반 패턴 분석", icon: "🔍", badge: "Mi:dm 128K" },
+    ],
+  },
+  {
+    title: "자동 생성",
+    items: [
+      { href: "/studio/curriculum", label: "커리큘럼·시험", icon: "📋", badge: "A.X K1" },
+      { href: "/studio/visual", label: "개념 시각화", icon: "🎨", badge: "VARCO" },
+      { href: "/studio/generate", label: "수업 도구", icon: "🧰" },
+    ],
+  },
+  {
+    title: "입력",
+    items: [
+      { href: "/studio/upload", label: "프린트물 업로드", icon: "📄", badge: "Upstage" },
+    ],
+  },
+  {
+    title: "운영",
+    items: [
+      { href: "/studio/classes", label: "반 관리", icon: "🏫" },
+      { href: "/studio/mypage", label: "마이페이지", icon: "👤" },
+    ],
+  },
 ];
 
 function AddBotModal({ onClose, onAdd }: { onClose: () => void; onAdd: (bot: TextbookBot) => void }) {
@@ -452,7 +502,8 @@ function StudioSidebar() {
   }, [user?.role]);
 
   const role = user?.role ?? null;
-  const navItems = role === "student" ? studentNav : role === "teacher" ? teacherNav : [];
+  const navSections =
+    role === "student" ? studentNavSections : role === "teacher" ? teacherNavSections : [];
 
   function handleLogout() {
     logout().finally(() => {
@@ -487,22 +538,47 @@ function StudioSidebar() {
 
       {role && (
         <>
-          {/* Navigation */}
-          <div className="mt-5 flex flex-wrap gap-2">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold transition-all ${
-                  pathname === item.href
-                    ? "bg-teal text-white shadow-lg"
-                    : "border border-white/10 bg-white/8 text-white/82 hover:bg-white/14"
-                }`}
-              >
-                {item.label}
-              </Link>
+          {/* Navigation — grouped by section */}
+          <nav className="mt-5 space-y-4">
+            {navSections.map((section) => (
+              <div key={section.title}>
+                <p className="mb-2 px-2 text-[10px] font-bold uppercase tracking-[0.14em] text-white/48">
+                  {section.title}
+                </p>
+                <ul className="space-y-1">
+                  {section.items.map((item) => {
+                    const active = pathname === item.href;
+                    return (
+                      <li key={item.href}>
+                        <Link
+                          href={item.href}
+                          className={`group flex items-center gap-2.5 rounded-[14px] px-3 py-2.5 text-sm font-medium transition-all ${
+                            active
+                              ? "bg-teal text-white shadow-lg shadow-teal/20"
+                              : "text-white/76 hover:bg-white/8 hover:text-white"
+                          }`}
+                        >
+                          <span className="text-base leading-none">{item.icon}</span>
+                          <span className="flex-1 truncate">{item.label}</span>
+                          {item.badge && (
+                            <span
+                              className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                                active
+                                  ? "bg-white/20 text-white"
+                                  : "bg-orange/20 text-orange/90 group-hover:bg-orange/30"
+                              }`}
+                            >
+                              {item.badge}
+                            </span>
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             ))}
-          </div>
+          </nav>
 
           {/* ===== TEACHER SIDEBAR ===== */}
           {role === "teacher" && (

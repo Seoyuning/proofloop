@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+import { AIProviderError, getChatProvider } from "@/lib/ai";
 
 interface ChatRequestBody {
   question: string;
@@ -124,9 +123,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
 
-  if (!GEMINI_API_KEY) {
+  const provider = getChatProvider();
+
+  if (!provider) {
     return NextResponse.json(
-      { error: "GEMINI_API_KEY가 설정되지 않았습니다." },
+      { error: "AI 채팅 모델이 설정되지 않았습니다. AI_PROVIDER 환경변수를 확인하세요." },
       { status: 500 }
     );
   }
@@ -141,142 +142,107 @@ export async function POST(request: Request) {
 
   const systemPrompt = buildSystemPrompt(body);
 
-  // Build Gemini contents array from history + new question
-  const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
-
-  // Add conversation history (last 10 messages for context)
   const recentHistory = body.history.slice(-10);
-  for (const msg of recentHistory) {
-    contents.push({
-      role: msg.role === "user" ? "user" : "model",
-      parts: [{ text: msg.text }],
-    });
-  }
+  const messages = [
+    ...recentHistory.map((m) => ({ role: m.role, text: m.text })),
+    { role: "user" as const, text: body.question },
+  ];
 
-  // Add current question
-  contents.push({
-    role: "user",
-    parts: [{ text: body.question }],
-  });
+  let text: string;
 
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1024,
-          },
-        }),
-      }
-    );
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error("[chat] Gemini error:", res.status, errText);
-      return NextResponse.json(
-        { error: "AI 응답을 받지 못했습니다." },
-        { status: 502 }
-      );
-    }
-
-    const data = await res.json();
-    const text =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ??
-      "답변을 생성하지 못했습니다.";
-
-    // Parse evidence, understanding level, and follow-up from the response
-    const lines = text.split("\n");
-    let mainAnswer = "";
-    let evidenceStr = "";
-    let followUp = "";
-    let understanding = 0;
-
-    for (const line of lines) {
-      if (line.startsWith("[근거]")) {
-        evidenceStr = line.replace("[근거]", "").trim();
-      } else if (line.startsWith("[이해도]")) {
-        understanding = parseInt(line.replace("[이해도]", "").trim(), 10) || 0;
-      } else if (line.startsWith("[후속 질문]")) {
-        followUp = line.replace("[후속 질문]", "").trim();
-      } else {
-        mainAnswer += line + "\n";
-      }
-    }
-
-    // Save question to DB if student is in a class
-    let resolvedSessionId: string | null = body.sessionId || null;
-    if (body.classId) {
-      try {
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          // Find which section the question relates to
-          const evidenceParts = evidenceStr.split("/").map((s: string) => s.trim());
-          const sectionTitle = evidenceParts[0] || null;
-
-          // Find misconception from the matched section
-          let misconception: string | null = null;
-          if (sectionTitle) {
-            const matchedSection = body.sections.find((s) =>
-              sectionTitle.includes(s.title) || s.title.includes(sectionTitle)
-            );
-            if (matchedSection) {
-              misconception = matchedSection.misconceptionTags[0] ?? null;
-            }
-          }
-
-          await supabase.from("student_questions").insert({
-            class_id: body.classId,
-            student_id: user.id,
-            question: body.question,
-            section_title: sectionTitle,
-            misconception,
-            understanding_level: understanding || null,
-          });
-
-          // Resolve session_id: use provided one, or auto-create
-          if (!resolvedSessionId) {
-            const { data: newSession } = await supabase
-              .from("chat_sessions")
-              .insert({
-                class_id: body.classId,
-                student_id: user.id,
-                title: body.question.slice(0, 30) + (body.question.length > 30 ? "..." : ""),
-              })
-              .select("id")
-              .single();
-            resolvedSessionId = newSession?.id ?? null;
-          }
-
-          // Save chat messages for history
-          await supabase.from("chat_messages").insert([
-            { class_id: body.classId, student_id: user.id, role: "user", message_text: body.question, session_id: resolvedSessionId },
-            { class_id: body.classId, student_id: user.id, role: "assistant", message_text: mainAnswer.trim(), evidence: evidenceStr || null, follow_up: followUp || null, understanding: understanding || null, session_id: resolvedSessionId },
-          ]);
-        }
-      } catch (e) {
-        console.error("[chat] failed to save question:", e);
-      }
-    }
-
-    return NextResponse.json({
-      answer: mainAnswer.trim(),
-      evidence: evidenceStr,
-      followUp: followUp,
-      understanding: understanding || null,
-      sessionId: resolvedSessionId,
+    text = await provider.chat({
+      systemPrompt,
+      messages,
+      temperature: 0.7,
+      maxTokens: 1024,
     });
   } catch (err) {
-    console.error("[chat] fetch failed:", err);
+    if (err instanceof AIProviderError) {
+      console.error(`[chat] ${err.provider} error:`, err.status, err.message);
+    } else {
+      console.error("[chat] fetch failed:", err);
+    }
     return NextResponse.json(
       { error: "AI 서버에 연결할 수 없습니다." },
       { status: 502 }
     );
   }
+
+  const lines = text.split("\n");
+  let mainAnswer = "";
+  let evidenceStr = "";
+  let followUp = "";
+  let understanding = 0;
+
+  for (const line of lines) {
+    if (line.startsWith("[근거]")) {
+      evidenceStr = line.replace("[근거]", "").trim();
+    } else if (line.startsWith("[이해도]")) {
+      understanding = parseInt(line.replace("[이해도]", "").trim(), 10) || 0;
+    } else if (line.startsWith("[후속 질문]")) {
+      followUp = line.replace("[후속 질문]", "").trim();
+    } else {
+      mainAnswer += line + "\n";
+    }
+  }
+
+  let resolvedSessionId: string | null = body.sessionId || null;
+  if (body.classId) {
+    try {
+      const supabase = await createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const evidenceParts = evidenceStr.split("/").map((s: string) => s.trim());
+        const sectionTitle = evidenceParts[0] || null;
+
+        let misconception: string | null = null;
+        if (sectionTitle) {
+          const matchedSection = body.sections.find((s) =>
+            sectionTitle.includes(s.title) || s.title.includes(sectionTitle)
+          );
+          if (matchedSection) {
+            misconception = matchedSection.misconceptionTags[0] ?? null;
+          }
+        }
+
+        await supabase.from("student_questions").insert({
+          class_id: body.classId,
+          student_id: user.id,
+          question: body.question,
+          section_title: sectionTitle,
+          misconception,
+          understanding_level: understanding || null,
+        });
+
+        if (!resolvedSessionId) {
+          const { data: newSession } = await supabase
+            .from("chat_sessions")
+            .insert({
+              class_id: body.classId,
+              student_id: user.id,
+              title: body.question.slice(0, 30) + (body.question.length > 30 ? "..." : ""),
+            })
+            .select("id")
+            .single();
+          resolvedSessionId = newSession?.id ?? null;
+        }
+
+        await supabase.from("chat_messages").insert([
+          { class_id: body.classId, student_id: user.id, role: "user", message_text: body.question, session_id: resolvedSessionId },
+          { class_id: body.classId, student_id: user.id, role: "assistant", message_text: mainAnswer.trim(), evidence: evidenceStr || null, follow_up: followUp || null, understanding: understanding || null, session_id: resolvedSessionId },
+        ]);
+      }
+    } catch (e) {
+      console.error("[chat] failed to save question:", e);
+    }
+  }
+
+  return NextResponse.json({
+    answer: mainAnswer.trim(),
+    evidence: evidenceStr,
+    followUp: followUp,
+    understanding: understanding || null,
+    sessionId: resolvedSessionId,
+  });
 }

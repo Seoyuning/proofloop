@@ -3,6 +3,7 @@ create table if not exists classes (
   id uuid default gen_random_uuid() primary key,
   teacher_id uuid references profiles(id) not null,
   name text not null,
+  school text,
   subject text not null,
   grade text not null,
   publisher text not null,

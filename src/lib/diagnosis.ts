@@ -1,4 +1,5 @@
 import type { CoachPriority, DiagnosisMode, DiagnosisPayload, DiagnosisResult } from "@/lib/types";
+import { getDiagnosisProvider } from "@/lib/ai";
 
 const STOPWORDS = new Set([
   "the",
@@ -494,28 +495,6 @@ export function normalizeDiagnosis(raw: unknown, fallback: DiagnosisResult, mode
   };
 }
 
-function extractGeminiText(data: unknown) {
-  if (!data || typeof data !== "object") {
-    return null;
-  }
-
-  const value = data as {
-    candidates?: Array<{
-      content?: {
-        parts?: Array<{ text?: string }>;
-      };
-    }>;
-  };
-
-  const parts = value.candidates?.[0]?.content?.parts ?? [];
-  const text = parts
-    .map((part) => (typeof part.text === "string" ? part.text : ""))
-    .join("")
-    .trim();
-
-  return text.length > 0 ? text : null;
-}
-
 function mergeLiveNarrativeWithFallbackMetrics(
   live: DiagnosisResult,
   fallback: DiagnosisResult,
@@ -528,17 +507,18 @@ function mergeLiveNarrativeWithFallbackMetrics(
   };
 }
 
-export async function analyzeWithOptionalGemini(payload: DiagnosisPayload) {
+export async function analyzeDiagnosis(payload: DiagnosisPayload) {
   const fallback = heuristicDiagnosis(payload, "demo_ai");
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  const model = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+  const provider = getDiagnosisProvider();
 
-  if (!apiKey) {
+  if (!provider) {
     return fallback;
   }
 
-  try {
-    const prompt = `You are ProofLoop, an educational reasoning auditor.
+  const systemPrompt =
+    "You analyze AI-assisted student work and produce instructor-ready JSON only. All narrative fields must be written in natural Korean.";
+
+  const userPrompt = `You are ProofLoop, an educational reasoning auditor.
 
 Return a balanced diagnosis of whether the learner truly understands the work.
 Be specific, practical, and instructor-ready.
@@ -554,53 +534,20 @@ Return JSON only.
 Payload:
 ${JSON.stringify(payload, null, 2)}`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "x-goog-api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: [
-              {
-                text: "You analyze AI-assisted student work and produce instructor-ready JSON only. All narrative fields must be written in natural Korean.",
-              },
-            ],
-          },
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: prompt }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.2,
-            responseMimeType: "application/json",
-            responseJsonSchema: schema,
-          },
-        }),
-        signal: AbortSignal.timeout(LIVE_ANALYSIS_TIMEOUT_MS),
-      },
-    );
+  try {
+    const parsed = await provider.chatJson({
+      systemPrompt,
+      userPrompt,
+      jsonSchema: schema,
+      temperature: 0.2,
+      timeoutMs: LIVE_ANALYSIS_TIMEOUT_MS,
+    });
 
-    if (!response.ok) {
-      return fallback;
-    }
-
-    const data = (await response.json()) as unknown;
-    const outputText = extractGeminiText(data);
-
-    if (!outputText) {
-      return fallback;
-    }
-
-    const parsed = JSON.parse(outputText);
     const live = normalizeDiagnosis(parsed, fallback, "live_ai");
     return mergeLiveNarrativeWithFallbackMetrics(live, fallback);
-  } catch {
+  } catch (err) {
+    console.error(`[diagnosis] ${provider.name} failed, falling back:`, err);
     return fallback;
   }
 }
+
