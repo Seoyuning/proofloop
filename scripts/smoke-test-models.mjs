@@ -20,7 +20,7 @@ try {
 
 // 앱의 createOpenAICompatProvider와 동일한 호출 형태 (Bearer + /chat/completions)
 const PROVIDERS = [
-  { label: "LG EXAONE", key: env.FRIENDLI_API_KEY, baseUrl: env.FRIENDLI_BASE_URL || "https://api.friendli.ai/serverless/v1", model: env.FRIENDLI_MODEL || "LGAI-EXAONE/EXAONE-4.0-32B" },
+  { label: "LG EXAONE", key: env.FRIENDLI_API_KEY, baseUrl: env.FRIENDLI_BASE_URL || "https://api.friendli.ai/dedicated/v1", model: env.FRIENDLI_MODEL, extraBody: { chat_template_kwargs: { enable_thinking: false } } },
   { label: "Upstage Solar", key: env.UPSTAGE_API_KEY, baseUrl: env.UPSTAGE_BASE_URL || "https://api.upstage.ai/v1/solar", model: env.UPSTAGE_MODEL || "solar-pro" },
   { label: "KT Mi:dm", key: env.KT_API_KEY, baseUrl: env.KT_BASE_URL || "https://api.friendli.ai/serverless/v1", model: env.KT_MODEL || "K-intelligence/Midm-2.0-Base-Instruct" },
   { label: "SKT A.X K1", key: env.SKT_API_KEY, baseUrl: env.SKT_BASE_URL || "https://api.platform.a.x/v1", model: env.SKT_MODEL || "ax-k1" },
@@ -36,7 +36,7 @@ async function test(p) {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${p.key}` },
       // 추론(reasoning) 모델은 사고 과정에 토큰을 쓰므로 넉넉히 준다
-      body: JSON.stringify({ model: p.model, messages: [{ role: "user", content: PROMPT }], temperature: 0.3, max_tokens: 1024 }),
+      body: JSON.stringify({ model: p.model, messages: [{ role: "user", content: PROMPT }], temperature: 0.3, max_tokens: 1024, ...(p.extraBody ?? {}) }),
       signal: AbortSignal.timeout(40000),
     });
     if (!res.ok) {
