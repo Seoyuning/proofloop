@@ -22,6 +22,9 @@ type ClassRow = {
   textbookName: string;
 };
 
+// 모바일에서 치기 어려운 수식 기호 — 입력창 위 빠른 삽입 툴바
+const MATH_SYMBOLS = ["²", "³", "√", "^", "×", "÷", "π", "≤", "≥", "≠", "±", "°", "½", "⅓", "∞"];
+
 /** 대화 시작 전 빈 화면을 채우는 온보딩: 추천 질문 + 답변 예시(가치 미리보기) */
 function ChatOnboarding({
   starterPrompts,
@@ -93,6 +96,7 @@ export default function StudentChatPage() {
   } = useStudio();
   const didHealClass = useRef(false);
   const [myClasses, setMyClasses] = useState<ClassRow[]>([]);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [showSessions, setShowSessions] = useState(false);
   const [weakSections, setWeakSections] = useState<WeakSection[]>([]);
   const [weakLoading, setWeakLoading] = useState(false);
@@ -147,6 +151,22 @@ export default function StudentChatPage() {
   const chatDescription = activeClassId && activeClassSubject
     ? "질문을 보내면 교과서 단원과 쪽수를 근거로 답변합니다. 이해가 안 되는 부분을 자유롭게 물어보세요."
     : "반에 참여하면 교과서 범위 안에서 근거를 포함한 답변을 받을 수 있습니다. 먼저 사이드바에서 반에 참여해 보세요.";
+
+  function insertSymbol(sym: string) {
+    const el = inputRef.current;
+    if (!el) {
+      setChatInput(chatInput + sym);
+      return;
+    }
+    const start = el.selectionStart ?? chatInput.length;
+    const end = el.selectionEnd ?? chatInput.length;
+    setChatInput(chatInput.slice(0, start) + sym + chatInput.slice(end));
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + sym.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
 
   return (
     <div className="space-y-4">
@@ -280,7 +300,22 @@ export default function StudentChatPage() {
           <div className="mt-6 rounded-[24px] border border-line bg-white/82 p-4">
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-navy">질문 입력</span>
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {MATH_SYMBOLS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => insertSymbol(s)}
+                    className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-navy transition-colors hover:border-teal hover:bg-teal/8"
+                    aria-label={`${s} 입력`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
               <textarea
+                ref={inputRef}
                 className="w-full rounded-[20px] border border-line bg-white px-4 py-3 text-sm leading-7 outline-none transition-colors placeholder:text-muted/70 focus:border-teal"
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => {
