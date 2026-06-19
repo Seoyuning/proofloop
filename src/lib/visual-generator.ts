@@ -90,6 +90,32 @@ function parseFormula(raw: string): { fn: (x: number) => number; vertex?: { x: n
   return { fn: (x) => x * x, vertex: { x: 0, y: 0 } };
 }
 
+/** 가시 구간에서 f(x)=0 이 되는 x(근=x절편)를 수치적으로 찾는다 (부호변화 + 이분법) */
+function findRoots(fn: (x: number) => number, xmin: number, xmax: number): number[] {
+  const roots: number[] = [];
+  const step = 0.05;
+  let px = xmin, py = fn(xmin);
+  for (let x = xmin + step; x <= xmax + 1e-9; x += step) {
+    const y = fn(x);
+    if (Number.isFinite(py) && Number.isFinite(y)) {
+      if (py === 0) roots.push(px);
+      else if (py * y < 0) {
+        let a = px, b = x, fa = py;
+        for (let i = 0; i < 50; i++) {
+          const m = (a + b) / 2, fm = fn(m);
+          if (!Number.isFinite(fm)) break;
+          if (fa * fm <= 0) b = m; else { a = m; fa = fm; }
+        }
+        roots.push((a + b) / 2);
+      }
+    }
+    px = x; py = y;
+  }
+  const out: number[] = [];
+  for (const r of roots) if (!out.some((o) => Math.abs(o - r) < 0.08)) out.push(r);
+  return out;
+}
+
 function mathGraphSvg(formula: string): string {
   const { fn, vertex } = parseFormula(formula);
   const samples: Array<{ x: number; y: number }> = [];
@@ -97,28 +123,51 @@ function mathGraphSvg(formula: string): string {
     const y = fn(x);
     if (Number.isFinite(y)) samples.push({ x, y });
   }
-  const yvals = samples.map((s) => s.y).filter((y) => Math.abs(y) <= 50);
-  let yMin = Math.min(0, ...yvals); let yMax = Math.max(0, ...yvals);
+  const y0 = fn(0);
+
+  // y범위: 가장자리 폭주 대신 중앙부(|x|≤6) + 핵심점(꼭짓점·절편) 기준 → 특징이 잘 보이게
+  const feats = [0, ...samples.filter((s) => Math.abs(s.x) <= 6 && Math.abs(s.y) <= 24).map((s) => s.y)];
+  if (Number.isFinite(y0) && Math.abs(y0) <= 30) feats.push(y0);
+  if (vertex && Math.abs(vertex.y) <= 30) feats.push(vertex.y);
+  let yMin = Math.min(...feats), yMax = Math.max(...feats);
   if (!Number.isFinite(yMin) || !Number.isFinite(yMax) || yMin === yMax) { yMin = -10; yMax = 10; }
-  const padY = (yMax - yMin) * 0.12 || 1; yMin -= padY; yMax += padY;
+  const padY = (yMax - yMin) * 0.15 || 1; yMin -= padY; yMax += padY;
+
   const plotW = GW - 2 * GM, plotH = GH - 2 * GM;
   const sx = (x: number) => GM + ((x - X_MIN) / (X_MAX - X_MIN)) * plotW;
   const sy = (y: number) => GM + (1 - (y - yMin) / (yMax - yMin)) * plotH;
+  const inY = (y: number) => y >= yMin && y <= yMax;
+
   let path = ""; let started = false;
   for (const s of samples) {
-    if (Math.abs(s.y) > 50) { started = false; continue; }
     const X = sx(s.x), Y = sy(s.y);
-    if (Y < GM - 4 || Y > GH - GM + 4) { started = false; continue; }
+    if (Y < GM - 6 || Y > GH - GM + 6) { started = false; continue; }
     path += (started ? " L " : " M ") + `${X.toFixed(1)} ${Y.toFixed(1)}`;
     started = true;
   }
   const ox = sx(0), oy = sy(0);
   const gridV = Array.from({ length: 11 }, (_, i) => { const X = sx(X_MIN + i * 2); return `<line x1="${X.toFixed(1)}" y1="${GM}" x2="${X.toFixed(1)}" y2="${GH - GM}" stroke="#102033" stroke-opacity="0.05"/>`; }).join("");
   const gridH = Array.from({ length: 9 }, (_, i) => { const Y = GM + (i * plotH) / 8; return `<line x1="${GM}" y1="${Y.toFixed(1)}" x2="${GW - GM}" y2="${Y.toFixed(1)}" stroke="#102033" stroke-opacity="0.05"/>`; }).join("");
-  const vertexMark = vertex && Math.abs(vertex.x) <= 10
+
+  // 마커 (좌표만 표기, 색은 범례로 구분) — 꼭짓점=주황, 절편=인디고
+  const vertexMark = vertex && Math.abs(vertex.x) <= 10 && inY(vertex.y)
     ? `<circle cx="${sx(vertex.x).toFixed(1)}" cy="${sy(vertex.y).toFixed(1)}" r="5" fill="#f97316" stroke="white" stroke-width="2"/>
-       <text x="${(sx(vertex.x) + 10).toFixed(1)}" y="${(sy(vertex.y) - 8).toFixed(1)}" fill="#f97316" font-size="13" font-weight="700" font-family="Pretendard">꼭짓점 (${+vertex.x.toFixed(2)}, ${+vertex.y.toFixed(2)})</text>`
+       <text x="${(sx(vertex.x) + 9).toFixed(1)}" y="${(sy(vertex.y) - 9).toFixed(1)}" fill="#f97316" font-size="12" font-weight="700" font-family="Pretendard">(${+vertex.x.toFixed(2)}, ${+vertex.y.toFixed(2)})</text>`
     : "";
+  const yIntMark = Number.isFinite(y0) && inY(y0)
+    ? `<circle cx="${sx(0).toFixed(1)}" cy="${sy(y0).toFixed(1)}" r="4.5" fill="#6366f1" stroke="white" stroke-width="2"/>
+       <text x="${(sx(0) - 9).toFixed(1)}" y="${(sy(y0) + 4).toFixed(1)}" text-anchor="end" fill="#6366f1" font-size="11.5" font-weight="700" font-family="Pretendard">(0, ${+y0.toFixed(2)})</text>`
+    : "";
+  const roots = findRoots(fn, X_MIN, X_MAX).slice(0, 4);
+  const xIntMarks = roots.map((r) =>
+    `<circle cx="${sx(r).toFixed(1)}" cy="${sy(0).toFixed(1)}" r="4.5" fill="#6366f1" stroke="white" stroke-width="2"/>
+     <text x="${sx(r).toFixed(1)}" y="${(sy(0) + 17).toFixed(1)}" text-anchor="middle" fill="#6366f1" font-size="11" font-weight="700" font-family="Pretendard">${+r.toFixed(2)}</text>`,
+  ).join("");
+
+  const legend = `
+  <circle cx="316" cy="15" r="4" fill="#f97316"/><text x="324" y="19" fill="#576274" font-size="10.5" font-family="Pretendard">꼭짓점</text>
+  <circle cx="372" cy="15" r="4" fill="#6366f1"/><text x="380" y="19" fill="#576274" font-size="10.5" font-family="Pretendard">x·y절편</text>`;
+
   return `
 <svg viewBox="0 0 ${GW} ${GH}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:#fff8ef;border-radius:16px;">
   <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#576274"/></marker></defs>
@@ -128,8 +177,9 @@ function mathGraphSvg(formula: string): string {
   <text x="${GW - GM + 4}" y="${(oy - 6).toFixed(1)}" fill="#576274" font-size="13" font-family="Pretendard">x</text>
   <text x="${(ox + 8).toFixed(1)}" y="${GM - 2}" fill="#576274" font-size="13" font-family="Pretendard">y</text>
   <path d="${path}" stroke="#0b8f80" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-  ${vertexMark}
+  ${xIntMarks}${yIntMark}${vertexMark}
   <text x="14" y="22" fill="#102033" font-size="14" font-weight="700" font-family="Pretendard">${escapeXml(formula)}</text>
+  ${legend}
 </svg>`.trim();
 }
 
@@ -298,7 +348,7 @@ function comicTemplate(concept: string): VisualResult["panels"] {
 /** 규칙기반(결정적) 결과 — LLM 없이도 동작하는 폴백 */
 export function heuristicVisual(kind: VisualKind, prompt: string): VisualResult {
   if (kind === "graph") {
-    return { mode: "demo_ai", modelName: "규칙기반 SVG", kind, prompt, svg: mathGraphSvg(prompt), description: `${prompt} 그래프 (이차함수는 꼭짓점 표시).` };
+    return { mode: "demo_ai", modelName: "규칙기반 SVG", kind, prompt, svg: mathGraphSvg(prompt), description: `${prompt} 그래프 (x절편·y절편, 이차함수는 꼭짓점 표시).` };
   }
   if (kind === "comic") {
     return { mode: "demo_ai", modelName: "템플릿", kind, prompt, panels: comicTemplate(prompt), description: `"${prompt}" 학습 만화 4컷.` };
