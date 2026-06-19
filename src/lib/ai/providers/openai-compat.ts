@@ -5,6 +5,8 @@ interface OpenAICompatOptions {
   baseUrl: string;
   apiKey: string;
   model: string;
+  // 모델별 추가 body 파라미터 (예: K-EXAONE의 chat_template_kwargs)
+  extraBody?: Record<string, unknown>;
 }
 
 interface OpenAIChatResponse {
@@ -66,6 +68,7 @@ export function createOpenAICompatProvider(opts: OpenAICompatOptions): AIProvide
           messages,
           temperature: req.temperature ?? 0.7,
           max_tokens: req.maxTokens ?? 1024,
+          ...(opts.extraBody ?? {}),
         },
         req.timeoutMs,
       );
@@ -83,6 +86,7 @@ export function createOpenAICompatProvider(opts: OpenAICompatOptions): AIProvide
           messages,
           temperature: req.temperature ?? 0.2,
           response_format: { type: "json_object" },
+          ...(opts.extraBody ?? {}),
         },
         req.timeoutMs,
       );

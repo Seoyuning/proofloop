@@ -29,6 +29,7 @@ interface ProviderEnv {
   apiKey: string;
   baseUrl: string;
   model: string;
+  extraBody?: Record<string, unknown>;
 }
 
 function envFor(kind: ProviderKind): ProviderEnv | null {
@@ -49,8 +50,12 @@ function envFor(kind: ProviderKind): ProviderEnv | null {
       return {
         kind,
         apiKey,
-        baseUrl: process.env.FRIENDLI_BASE_URL?.trim() || "https://api.friendli.ai/serverless/v1",
-        model: process.env.FRIENDLI_MODEL?.trim() || "LGAI-EXAONE/K-EXAONE-236B-A23B",
+        // 대회 공식 가이드: FriendliAI Dedicated Endpoint 사용
+        baseUrl: process.env.FRIENDLI_BASE_URL?.trim() || "https://api.friendli.ai/dedicated/v1",
+        // Dedicated에서 model은 배포된 Endpoint ID (계정별 고유) — 반드시 FRIENDLI_MODEL로 지정
+        model: process.env.FRIENDLI_MODEL?.trim() || "K-EXAONE-236B-A23B",
+        // K-EXAONE Controllable Reasoning(default true) → 끄면 빈 응답/지연 방지 + 속도↑
+        extraBody: { chat_template_kwargs: { enable_thinking: false } },
       };
     }
     case "upstage-solar": {
@@ -84,6 +89,7 @@ function build(env: ProviderEnv): AIProvider {
     baseUrl: env.baseUrl,
     apiKey: env.apiKey,
     model: env.model,
+    extraBody: env.extraBody,
   });
 }
 
