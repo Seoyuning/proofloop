@@ -13,6 +13,15 @@ type WeakSection = {
   misconceptions: string[];
 };
 
+type ClassRow = {
+  id: string;
+  name: string;
+  subject: string;
+  grade: string;
+  publisher: string;
+  textbookName: string;
+};
+
 /** 대화 시작 전 빈 화면을 채우는 온보딩: 추천 질문 + 답변 예시(가치 미리보기) */
 function ChatOnboarding({
   starterPrompts,
@@ -82,6 +91,7 @@ export default function StudentChatPage() {
     chatSessions, activeChatSessionId, handleNewChatSession, handleSwitchSession,
   } = useStudio();
   const didHealClass = useRef(false);
+  const [myClasses, setMyClasses] = useState<ClassRow[]>([]);
   const [showSessions, setShowSessions] = useState(false);
   const [weakSections, setWeakSections] = useState<WeakSection[]>([]);
   const [weakLoading, setWeakLoading] = useState(false);
@@ -92,24 +102,24 @@ export default function StudentChatPage() {
     if (user.role !== "student") { router.replace("/studio/analysis"); }
   }, [user, isLoading, router]);
 
-  // Self-heal: 사이드바가 active class를 못 채운 경우, 채팅 페이지가 직접 참여한 반을 확인해 선택.
-  // (반에 참여했는데도 "반에 참여하세요"가 뜨는 버그 방지)
+  // 참여한 반 목록을 받아와 전환 스위처에 채우고, active class가 없으면 첫 반을 선택(self-heal).
+  // (반에 참여했는데도 "반에 참여하세요"가 뜨는 버그 방지 + 상단 스위처 노출)
   useEffect(() => {
-    if (activeClassId || didHealClass.current) return;
+    if (didHealClass.current) return;
     didHealClass.current = true;
     fetch("/api/classes")
       .then((r) => r.json())
       .then((d) => {
-        const cls = d.classes?.[0];
-        if (cls) {
-          switchBotForClass({
-            id: cls.id,
-            subject: cls.subject ?? "",
-            grade: cls.grade ?? "",
-            publisher: cls.publisher ?? "",
-            textbookName: cls.textbook_name ?? "",
-          });
-        }
+        const list: ClassRow[] = (d.classes ?? []).map((c: { id: string; name?: string; subject?: string; grade?: string; publisher?: string; textbook_name?: string }) => ({
+          id: c.id,
+          name: c.name ?? "",
+          subject: c.subject ?? "",
+          grade: c.grade ?? "",
+          publisher: c.publisher ?? "",
+          textbookName: c.textbook_name ?? "",
+        }));
+        setMyClasses(list);
+        if (!activeClassId && list[0]) switchBotForClass(list[0]);
       })
       .catch(() => {});
   }, [activeClassId, switchBotForClass]);
@@ -155,6 +165,33 @@ export default function StudentChatPage() {
           {chatDescription}
         </p>
       </header>
+
+      {/* 반 전환 스위처 — 현재 공부 중인 반을 명확히 보여주고 한 번에 전환 */}
+      {myClasses.length > 0 && (
+        <div className="app-panel rounded-[28px] px-4 py-3 sm:px-5 sm:py-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="mr-1 text-[11px] font-bold uppercase tracking-[0.12em] text-muted">현재 반</span>
+            {myClasses.map((c) => {
+              const active = activeClassId === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => switchBotForClass(c)}
+                  aria-pressed={active}
+                  className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition-all ${
+                    active
+                      ? "bg-teal text-white shadow-md"
+                      : "border border-line bg-white text-muted hover:border-teal/40 hover:text-navy"
+                  }`}
+                >
+                  {c.subject ? `${c.subject} · ` : ""}{c.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <section className="app-panel rounded-[28px] p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
