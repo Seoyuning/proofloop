@@ -97,6 +97,9 @@ export default function StudentChatPage() {
   const didHealClass = useRef(false);
   const [myClasses, setMyClasses] = useState<ClassRow[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrNote, setOcrNote] = useState<string | null>(null);
   const [showSessions, setShowSessions] = useState(false);
   const [weakSections, setWeakSections] = useState<WeakSection[]>([]);
   const [weakLoading, setWeakLoading] = useState(false);
@@ -166,6 +169,36 @@ export default function StudentChatPage() {
       const pos = start + sym.length;
       el.setSelectionRange(pos, pos);
     });
+  }
+
+  // 사진으로 질문: Upstage OCR로 인식 → 입력창에 넣어 학생이 확인/수정 후 전송 (바로 보내지 않음)
+  async function handlePhoto(file: File | null) {
+    if (!file) return;
+    setOcrLoading(true);
+    setOcrNote(null);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("kind", "student-photo");
+      const res = await fetch("/api/document-parse", { method: "POST", body: fd });
+      const data = await res.json();
+      const text = ((data.elements ?? []) as Array<{ text?: string }>)
+        .map((e) => e?.text ?? "")
+        .join("\n")
+        .trim();
+      if (text) {
+        setChatInput(chatInput ? `${chatInput}\n${text}` : text);
+        setOcrNote("사진에서 문제를 인식했어요. 맞는지 확인하고 보내세요.");
+        inputRef.current?.focus();
+      } else {
+        setOcrNote("사진에서 글자를 찾지 못했어요. 또박또박 다시 찍거나 직접 입력해 주세요.");
+      }
+    } catch {
+      setOcrNote("사진 인식에 실패했어요. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setOcrLoading(false);
+      if (photoInputRef.current) photoInputRef.current.value = "";
+    }
   }
 
   return (
@@ -331,7 +364,19 @@ export default function StudentChatPage() {
               />
             </label>
 
-            <div className="mt-4 flex items-center justify-end">
+            {ocrNote && (
+              <p className="mt-3 rounded-[14px] bg-teal/8 px-4 py-2.5 text-xs leading-5 text-navy">{ocrNote}</p>
+            )}
+
+            <div className="mt-4 flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={ocrLoading}
+                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-white px-4 py-3 text-sm font-semibold text-navy transition-colors hover:border-teal disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {ocrLoading ? "인식 중…" : "📷 사진으로 질문"}
+              </button>
               <button
                 className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-orange px-5 py-3 text-sm font-semibold text-white transition-transform duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={handleSendQuestion}
@@ -341,6 +386,13 @@ export default function StudentChatPage() {
                 {chatLoading ? "답변 생성 중..." : "질문 보내기"}
               </button>
             </div>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)}
+            />
           </div>
         ) : (
           <div className="mt-6 rounded-[24px] border border-orange/20 bg-orange/5 p-5 text-center">

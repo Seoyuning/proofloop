@@ -35,7 +35,6 @@ const studentNavSections: NavSection[] = [
     title: "학습",
     items: [
       { href: "/studio/chat", label: "질문하기", icon: "💬" },
-      { href: "/studio/upload", label: "문제 사진 풀이", icon: "📸", badge: "Upstage" },
       { href: "/studio/reasoning", label: "풀이 채점", icon: "✍️", badge: "EXAONE" },
       { href: "/studio/visual", label: "개념 시각화", icon: "🎨", badge: "VARCO" },
     ],
