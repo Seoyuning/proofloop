@@ -88,7 +88,6 @@ textarea {
   background: var(--surface);
   border: 1px solid var(--line);
   box-shadow: var(--paper-shadow);
-  backdrop-filter: blur(18px);
 }
 
 .display-title {
@@ -118,7 +117,6 @@ textarea {
   background: rgba(255, 251, 246, 0.92);
   border: 1px solid rgba(16, 32, 51, 0.1);
   box-shadow: 0 24px 60px rgba(16, 32, 51, 0.08);
-  backdrop-filter: blur(18px);
 }
 
 .app-sidebar-panel {
@@ -127,7 +125,6 @@ textarea {
     linear-gradient(135deg, rgba(11, 143, 128, 0.18), transparent 50%);
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 26px 70px rgba(16, 32, 51, 0.18);
-  backdrop-filter: blur(20px);
 }
 
 .app-segment {
