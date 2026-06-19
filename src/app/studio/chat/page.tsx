@@ -223,7 +223,8 @@ export default function StudentChatPage() {
                 className="w-full rounded-[20px] border border-line bg-white px-4 py-3 text-sm leading-7 outline-none transition-colors placeholder:text-muted/70 focus:border-teal"
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  // 한글 IME 조합 중에는 Enter로 보내지 않음 (마지막 글자가 입력칸에 남는 버그 방지)
+                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                     e.preventDefault();
                     handleSendQuestion();
                   }
