@@ -70,53 +70,44 @@ function cleanMarkdown(text: string): string {
 }
 
 export function MessageBubble({ message }: { message: ChatMessage }) {
-  const displayText = message.role === "assistant" ? cleanMarkdown(message.text) : message.text;
+  const isUser = message.role === "user";
 
-  return (
-    <div
-      className={`rounded-[26px] border p-4 ${
-        message.role === "assistant" ? "border-line bg-white" : "border-navy/12 bg-navy text-white"
-      }`}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <p className={`text-sm font-semibold ${message.role === "assistant" ? "text-navy" : "text-white"}`}>
-          {message.role === "assistant" ? "교과서 챗봇" : "학생 질문"}
-        </p>
-        {message.unitLabel ? (
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              message.role === "assistant" ? "bg-teal/10 text-teal" : "bg-white/12 text-white"
-            }`}
-          >
-            {message.unitLabel}
-          </span>
-        ) : null}
-      </div>
-
-      <p
-        className={`mt-3 whitespace-pre-wrap leading-8 ${
-          message.role === "assistant" ? "text-[15px] text-foreground" : "text-sm text-white/86"
-        }`}
-      >
-        {displayText}
-      </p>
-
-      {message.evidence && message.evidence.length > 0 ? (
-        <div className="mt-4 grid gap-3">
-          {message.evidence.map((evidence) => (
-            <div key={`${evidence.unitTitle}-${evidence.pages}`} className="rounded-[20px] border border-line bg-surface-strong p-3">
-              <p className="text-sm font-semibold text-navy">
-                {evidence.unitTitle} / {evidence.pages}
-              </p>
-              <p className="mt-2 text-sm leading-6 text-muted">{evidence.reason}</p>
-            </div>
-          ))}
+  // 유저 메시지 — 우측 말풍선
+  if (isUser) {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[85%] whitespace-pre-wrap rounded-[22px] rounded-br-md bg-navy px-4 py-2.5 text-sm leading-7 text-white">
+          {message.text}
         </div>
-      ) : null}
+      </div>
+    );
+  }
 
-      {message.understanding && message.understanding > 0 ? (
-        <div className="mt-4 rounded-[20px] border border-line bg-surface-strong p-3">
-          <div className="flex items-center gap-2">
+  // AI 메시지 — 아바타 + 플랫 텍스트 (LLM 챗 스타일)
+  const displayText = cleanMarkdown(message.text);
+  return (
+    <div className="flex gap-3">
+      <div className="mt-1 flex h-7 w-7 flex-none items-center justify-center rounded-full bg-navy text-[11px] font-bold text-white">P</div>
+      <div className="min-w-0 flex-1 space-y-3">
+        <p className="whitespace-pre-wrap text-[15px] leading-8 text-foreground">{displayText}</p>
+
+        {message.unitLabel ? (
+          <span className="inline-block rounded-full bg-teal/10 px-3 py-1 text-xs font-medium text-teal">{message.unitLabel}</span>
+        ) : null}
+
+        {message.evidence && message.evidence.length > 0 ? (
+          <div className="grid gap-2">
+            {message.evidence.map((evidence) => (
+              <div key={`${evidence.unitTitle}-${evidence.pages}`} className="rounded-[16px] border border-line bg-surface-strong p-3">
+                <p className="text-sm font-semibold text-navy">📎 {evidence.unitTitle} / {evidence.pages}</p>
+                <p className="mt-1.5 text-sm leading-6 text-muted">{evidence.reason}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {message.understanding && message.understanding > 0 ? (
+          <div className="flex flex-wrap items-center gap-2 rounded-[16px] border border-line bg-surface-strong px-3 py-2">
             <p className="text-xs font-semibold text-muted">이해도</p>
             <div className="flex gap-1">
               {[1, 2, 3, 4, 5].map((level) => (
@@ -134,15 +125,15 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
               {message.understanding === 1 ? "매우 부족" : message.understanding === 2 ? "부족" : message.understanding === 3 ? "보통" : message.understanding === 4 ? "양호" : "우수"}
             </span>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {message.followUp ? (
-        <div className="mt-4 rounded-[20px] border border-teal/16 bg-teal/7 p-3">
-          <p className="text-sm font-semibold text-navy">이어서 생각해 볼 질문</p>
-          <p className="mt-2 text-sm leading-6 text-muted">{message.followUp}</p>
-        </div>
-      ) : null}
+        {message.followUp ? (
+          <div className="rounded-[16px] border border-teal/16 bg-teal/7 p-3">
+            <p className="text-xs font-semibold text-navy">이어서 생각해 볼 질문</p>
+            <p className="mt-1.5 text-sm leading-6 text-muted">{message.followUp}</p>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
