@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { SectionHeader } from "@/components/studio-ui";
 import type { VisualResult, VisualKind } from "@/lib/visual-generator";
+
+// 그래프 수식 입력용 기호 (모바일에서 치기 어려운 것들)
+const MATH_SYMBOLS = ["²", "³", "^", "√", "×", "÷", "(", ")", "π", "≤", "≥"];
 
 export default function VisualPage() {
   const router = useRouter();
@@ -13,6 +16,7 @@ export default function VisualPage() {
   const [prompt, setPrompt] = useState("");
   const [result, setResult] = useState<VisualResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isLoading) return;
@@ -40,6 +44,19 @@ export default function VisualPage() {
     setKind(k);
     setPrompt("");
     setResult(null);
+  }
+
+  function insertSymbol(sym: string) {
+    const el = inputRef.current;
+    if (!el) { setPrompt(prompt + sym); return; }
+    const start = el.selectionStart ?? prompt.length;
+    const end = el.selectionEnd ?? prompt.length;
+    setPrompt(prompt.slice(0, start) + sym + prompt.slice(end));
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + sym.length;
+      el.setSelectionRange(pos, pos);
+    });
   }
 
   const placeholder =
@@ -79,8 +96,26 @@ export default function VisualPage() {
           ))}
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-3">
+        {kind === "graph" && (
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            {MATH_SYMBOLS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                tabIndex={-1}
+                onClick={() => insertSymbol(s)}
+                aria-label={`${s} 입력`}
+                className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-navy transition-colors hover:border-teal hover:bg-teal/8"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className={`${kind === "graph" ? "mt-2" : "mt-4"} flex flex-wrap gap-3`}>
           <input
+            ref={inputRef}
             type="text"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
