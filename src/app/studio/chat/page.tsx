@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useStudio } from "@/lib/studio-context";
-import { MessageBubble, SectionHeader } from "@/components/studio-ui";
+import { MessageBubble } from "@/components/studio-ui";
 
 type WeakSection = {
   sectionTitle: string;
@@ -36,7 +36,7 @@ function ChatOnboarding({
   canAsk: boolean;
 }) {
   return (
-    <div className="space-y-3">
+    <div className="mx-auto w-full max-w-2xl space-y-3">
       {/* 추천 질문 */}
       <div className="rounded-[24px] border border-line bg-white/72 p-5">
         <p className="text-sm font-semibold text-navy">💡 이렇게 물어보세요</p>
@@ -101,6 +101,7 @@ export default function StudentChatPage() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrNote, setOcrNote] = useState<string | null>(null);
   const [showSessions, setShowSessions] = useState(false);
+  const [weaknessOpen, setWeaknessOpen] = useState(false);
   const [weakSections, setWeakSections] = useState<WeakSection[]>([]);
   const [weakLoading, setWeakLoading] = useState(false);
 
@@ -111,21 +112,22 @@ export default function StudentChatPage() {
   }, [user, isLoading, router]);
 
   // 참여한 반 목록을 받아와 전환 스위처에 채우고, active class가 없으면 첫 반을 선택(self-heal).
-  // (반에 참여했는데도 "반에 참여하세요"가 뜨는 버그 방지 + 상단 스위처 노출)
   useEffect(() => {
     if (didHealClass.current) return;
     didHealClass.current = true;
     fetch("/api/classes")
       .then((r) => r.json())
       .then((d) => {
-        const list: ClassRow[] = (d.classes ?? []).map((c: { id: string; name?: string; subject?: string; grade?: string; publisher?: string; textbook_name?: string }) => ({
-          id: c.id,
-          name: c.name ?? "",
-          subject: c.subject ?? "",
-          grade: c.grade ?? "",
-          publisher: c.publisher ?? "",
-          textbookName: c.textbook_name ?? "",
-        }));
+        const list: ClassRow[] = (d.classes ?? []).map(
+          (c: { id: string; name?: string; subject?: string; grade?: string; publisher?: string; textbook_name?: string }) => ({
+            id: c.id,
+            name: c.name ?? "",
+            subject: c.subject ?? "",
+            grade: c.grade ?? "",
+            publisher: c.publisher ?? "",
+            textbookName: c.textbook_name ?? "",
+          }),
+        );
         setMyClasses(list);
         if (!activeClassId && list[0]) switchBotForClass(list[0]);
       })
@@ -151,9 +153,6 @@ export default function StudentChatPage() {
   const chatTitle = activeClassId && activeClassSubject
     ? `${studentGrade} ${activeClassSubject} 챗봇`
     : `${studentGrade} 챗봇`;
-  const chatDescription = activeClassId && activeClassSubject
-    ? "질문을 보내면 교과서 단원과 쪽수를 근거로 답변합니다. 이해가 안 되는 부분을 자유롭게 물어보세요."
-    : "반에 참여하면 교과서 범위 안에서 근거를 포함한 답변을 받을 수 있습니다. 먼저 사이드바에서 반에 참여해 보세요.";
 
   function insertSymbol(sym: string) {
     const el = inputRef.current;
@@ -202,64 +201,33 @@ export default function StudentChatPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <header className="app-panel rounded-[28px] p-5 sm:p-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-teal/10 px-3 py-1 text-xs font-semibold text-teal">Grounded Answering</span>
-          {activeClassId && currentBot.publisher && (
-            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-foreground">
-              {currentBot.publisher} {currentBot.textbookName}
-            </span>
-          )}
-        </div>
-        <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-navy sm:text-3xl">
-          {chatTitle}
-        </h2>
-        <p className="mt-2 max-w-3xl text-sm leading-7 text-muted">
-          {chatDescription}
-        </p>
-      </header>
-
-      {/* 반 전환 스위처 — 현재 공부 중인 반을 명확히 보여주고 한 번에 전환 */}
-      {myClasses.length > 0 && (
-        <div className="app-panel rounded-[28px] px-4 py-3 sm:px-5 sm:py-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="mr-1 text-[11px] font-bold uppercase tracking-[0.12em] text-muted">현재 반</span>
-            {myClasses.map((c) => {
-              const active = activeClassId === c.id;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => switchBotForClass(c)}
-                  aria-pressed={active}
-                  className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition-all ${
-                    active
-                      ? "bg-teal text-white shadow-md"
-                      : "border border-line bg-white text-muted hover:border-teal/40 hover:text-navy"
-                  }`}
-                >
-                  {c.subject ? `${c.subject} · ` : ""}{c.name}
-                </button>
-              );
-            })}
+    <div className="flex h-[calc(100dvh-5rem)] flex-col gap-3 lg:h-[calc(100vh-1.5rem)]">
+      {/* 상단 바 — 제목 + 반 전환 + 액션 */}
+      <header className="app-panel shrink-0 rounded-[24px] px-4 py-3 sm:px-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2">
+            <h2 className="truncate text-lg font-semibold tracking-[-0.02em] text-navy sm:text-xl">{chatTitle}</h2>
+            {activeClassId && currentBot.publisher && (
+              <span className="hidden whitespace-nowrap rounded-full bg-teal/10 px-2.5 py-0.5 text-[11px] font-semibold text-teal sm:inline">
+                {currentBot.publisher} {currentBot.textbookName}
+              </span>
+            )}
           </div>
-        </div>
-      )}
-
-      <section className="app-panel rounded-[28px] p-5 sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <SectionHeader
-            kicker="학생 대화"
-            title="질문과 답변"
-            copy="교과서 범위 안에서 근거를 포함해 답변합니다. 질문은 자동으로 데이터에 누적됩니다."
-          />
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             {activeClassId && (
               <button
                 type="button"
-                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-navy px-4 py-2.5 text-xs font-semibold text-white transition-transform hover:-translate-y-0.5"
+                onClick={() => setWeaknessOpen(true)}
+                className="whitespace-nowrap rounded-full border border-line bg-white px-3 py-2 text-xs font-semibold text-navy transition-colors hover:border-teal"
+              >
+                📊 내 약점
+              </button>
+            )}
+            {activeClassId && (
+              <button
+                type="button"
                 onClick={handleNewChatSession}
+                className="whitespace-nowrap rounded-full bg-navy px-3 py-2 text-xs font-semibold text-white transition-transform hover:-translate-y-0.5"
               >
                 + 새 채팅
               </button>
@@ -268,13 +236,13 @@ export default function StudentChatPage() {
               <div className="relative">
                 <button
                   type="button"
-                  className="rounded-[20px] border border-line bg-white px-4 py-2.5 text-xs font-medium text-muted transition-colors hover:border-teal"
+                  className="whitespace-nowrap rounded-full border border-line bg-white px-3 py-2 text-xs font-medium text-muted transition-colors hover:border-teal"
                   onClick={() => setShowSessions(!showSessions)}
                 >
-                  대화 {recentMessages.length}건 {showSessions ? "▲" : "▼"}
+                  기록 {showSessions ? "▲" : "▼"}
                 </button>
                 {showSessions && (
-                  <div className="absolute right-0 top-full z-20 mt-1 w-56 max-h-60 overflow-y-auto rounded-[18px] border border-line bg-white p-2 shadow-xl">
+                  <div className="app-scroll absolute right-0 top-full z-30 mt-1 max-h-72 w-56 overflow-y-auto rounded-[18px] border border-line bg-white p-2 shadow-xl">
                     {chatSessions.map((s) => (
                       <button
                         key={s.id}
@@ -290,179 +258,198 @@ export default function StudentChatPage() {
                         }}
                       >
                         <p className="truncate">{s.title}</p>
-                        <p className="mt-0.5 text-[10px] text-muted/60">
-                          {new Date(s.created_at).toLocaleDateString("ko-KR")}
-                        </p>
+                        <p className="mt-0.5 text-[10px] text-muted/60">{new Date(s.created_at).toLocaleDateString("ko-KR")}</p>
                       </button>
                     ))}
                   </div>
                 )}
               </div>
             )}
-            {chatSessions.length === 0 && (
-              <div className="rounded-[20px] border border-line bg-white px-4 py-3 text-sm text-muted">
-                대화 {recentMessages.length}건
-              </div>
-            )}
           </div>
         </div>
 
-        <div className="app-scroll mt-6 max-h-[60vh] sm:max-h-[560px] space-y-3 overflow-y-auto pr-1">
-          {hasConversation ? (
-            recentMessages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
-            ))
-          ) : (
-            !chatLoading && (
-              <ChatOnboarding
-                starterPrompts={currentBot.starterPrompts}
-                onPick={setChatInput}
-                canAsk={!!activeClassId}
-              />
-            )
-          )}
-          {chatLoading && (
-            <div className="rounded-[26px] border border-line bg-white/72 p-4">
-              <p className="text-sm font-semibold text-navy">교과서 챗봇</p>
-              <p className="mt-3 text-sm text-muted animate-pulse">답변을 생성하고 있습니다...</p>
-            </div>
-          )}
-        </div>
-
-        {activeClassId ? (
-          <div className="mt-6 rounded-[24px] border border-line bg-white/82 p-4">
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-navy">질문 입력</span>
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                {MATH_SYMBOLS.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    tabIndex={-1}
-                    onClick={() => insertSymbol(s)}
-                    className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-navy transition-colors hover:border-teal hover:bg-teal/8"
-                    aria-label={`${s} 입력`}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-              <textarea
-                ref={inputRef}
-                className="w-full rounded-[20px] border border-line bg-white px-4 py-3 text-sm leading-7 outline-none transition-colors placeholder:text-muted/70 focus:border-teal"
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => {
-                  // 한글 IME 조합 중에는 Enter로 보내지 않음 (마지막 글자가 입력칸에 남는 버그 방지)
-                  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-                    e.preventDefault();
-                    handleSendQuestion();
-                  }
-                }}
-                placeholder={currentBot.starterPrompts[0]}
-                rows={3}
-                value={chatInput}
-              />
-            </label>
-
-            {ocrNote && (
-              <p className="mt-3 rounded-[14px] bg-teal/8 px-4 py-2.5 text-xs leading-5 text-navy">{ocrNote}</p>
-            )}
-
-            <div className="mt-4 flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={() => photoInputRef.current?.click()}
-                disabled={ocrLoading}
-                className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-white px-4 py-3 text-sm font-semibold text-navy transition-colors hover:border-teal disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {ocrLoading ? "인식 중…" : "📷 사진으로 질문"}
-              </button>
-              <button
-                className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-orange px-5 py-3 text-sm font-semibold text-white transition-transform duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-                onClick={handleSendQuestion}
-                disabled={chatLoading}
-                type="button"
-              >
-                {chatLoading ? "답변 생성 중..." : "질문 보내기"}
-              </button>
-            </div>
-            <input
-              ref={photoInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)}
-            />
-          </div>
-        ) : (
-          <div className="mt-6 rounded-[24px] border border-orange/20 bg-orange/5 p-5 text-center">
-            <p className="text-sm font-semibold text-navy">반에 먼저 참여해 주세요</p>
-            <p className="mt-2 text-sm text-muted">사이드바에서 선생님이 알려준 초대 코드를 입력하면 해당 교과서 챗봇을 사용할 수 있습니다.</p>
+        {/* 반 전환 스위처 */}
+        {myClasses.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-[11px] font-bold uppercase tracking-[0.12em] text-muted">현재 반</span>
+            {myClasses.map((c) => {
+              const active = activeClassId === c.id;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => switchBotForClass(c)}
+                  aria-pressed={active}
+                  className={`whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition-all ${
+                    active ? "bg-teal text-white shadow-md" : "border border-line bg-white text-muted hover:border-teal/40 hover:text-navy"
+                  }`}
+                >
+                  {c.subject ? `${c.subject} · ` : ""}{c.name}
+                </button>
+              );
+            })}
           </div>
         )}
-      </section>
+      </header>
 
-      {/* Weakness Report */}
-      {activeClassId && (
-        <section className="app-panel rounded-[28px] p-5 sm:p-6">
-          <SectionHeader
-            kicker="학습 분석"
-            title="내 약점 리포트"
-            copy="질문 데이터를 기반으로 이해도가 낮은 단원을 보여줍니다."
+      {/* 메시지 — 남는 공간을 채움 */}
+      <div className="app-panel app-scroll flex-1 space-y-3 overflow-y-auto rounded-[24px] p-4 sm:p-5">
+        {hasConversation ? (
+          recentMessages.map((message) => <MessageBubble key={message.id} message={message} />)
+        ) : (
+          !chatLoading && (
+            <ChatOnboarding
+              starterPrompts={currentBot.starterPrompts}
+              onPick={setChatInput}
+              canAsk={!!activeClassId}
+            />
+          )
+        )}
+        {chatLoading && (
+          <div className="rounded-[26px] border border-line bg-white/72 p-4">
+            <p className="text-sm font-semibold text-navy">교과서 챗봇</p>
+            <p className="mt-3 text-sm text-muted animate-pulse">답변을 생성하고 있습니다...</p>
+          </div>
+        )}
+      </div>
+
+      {/* 입력 — 하단 고정 */}
+      {activeClassId ? (
+        <div className="app-panel shrink-0 rounded-[24px] p-3 sm:p-4">
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {MATH_SYMBOLS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                tabIndex={-1}
+                onClick={() => insertSymbol(s)}
+                className="rounded-lg border border-line bg-white px-2.5 py-1.5 text-sm text-navy transition-colors hover:border-teal hover:bg-teal/8"
+                aria-label={`${s} 입력`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+          <textarea
+            ref={inputRef}
+            className="w-full resize-none rounded-[18px] border border-line bg-white px-4 py-3 text-sm leading-7 outline-none transition-colors placeholder:text-muted/70 focus:border-teal"
+            onChange={(e) => setChatInput(e.target.value)}
+            onKeyDown={(e) => {
+              // 한글 IME 조합 중에는 Enter로 보내지 않음 (마지막 글자가 입력칸에 남는 버그 방지)
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+                e.preventDefault();
+                handleSendQuestion();
+              }
+            }}
+            placeholder={currentBot.starterPrompts[0]}
+            rows={2}
+            value={chatInput}
           />
+          {ocrNote && (
+            <p className="mt-2 rounded-[14px] bg-teal/8 px-4 py-2.5 text-xs leading-5 text-navy">{ocrNote}</p>
+          )}
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={ocrLoading}
+              className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-line bg-white px-4 py-2.5 text-sm font-semibold text-navy transition-colors hover:border-teal disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {ocrLoading ? "인식 중…" : "📷 사진으로 질문"}
+            </button>
+            <button
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-full bg-orange px-5 py-2.5 text-sm font-semibold text-white transition-transform duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={handleSendQuestion}
+              disabled={chatLoading}
+              type="button"
+            >
+              {chatLoading ? "답변 생성 중..." : "보내기"}
+            </button>
+          </div>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => handlePhoto(e.target.files?.[0] ?? null)}
+          />
+        </div>
+      ) : (
+        <div className="app-panel shrink-0 rounded-[24px] p-5 text-center">
+          <p className="text-sm font-semibold text-navy">반에 먼저 참여해 주세요</p>
+          <p className="mt-2 text-sm text-muted">사이드바에서 선생님이 알려준 초대 코드를 입력하면 해당 교과서 챗봇을 사용할 수 있습니다.</p>
+        </div>
+      )}
 
-          {weakLoading ? (
-            <div className="mt-6 text-sm text-muted animate-pulse">분석 중...</div>
-          ) : weakSections.length === 0 ? (
-            <div className="mt-6 rounded-[20px] border border-line bg-surface-strong p-4 text-center">
-              <p className="text-sm text-muted">질문을 더 보내면 약점 리포트가 생성됩니다.</p>
+      {/* 내 약점 리포트 — 우측 드로어 */}
+      {weaknessOpen && (
+        <div className="fixed inset-0 z-50 flex bg-black/40" onClick={() => setWeaknessOpen(false)}>
+          <aside
+            className="ml-auto flex h-full w-full max-w-md flex-col bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-line px-5 py-4">
+              <div>
+                <p className="eyebrow text-xs text-muted">학습 분석</p>
+                <h3 className="text-lg font-semibold text-navy">내 약점 리포트</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWeaknessOpen(false)}
+                className="rounded-full border border-line bg-white px-3 py-1.5 text-sm font-semibold text-muted transition-colors hover:border-teal hover:text-navy"
+              >
+                ✕
+              </button>
             </div>
-          ) : (
-            <div className="mt-6 space-y-3">
-              {weakSections.map((section) => (
-                <div key={section.sectionTitle} className="rounded-[20px] border border-line bg-white p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-navy">{section.sectionTitle}</p>
-                      <p className="mt-1 text-xs text-muted">질문 {section.questionCount}건</p>
-                    </div>
-                    {section.avgUnderstanding > 0 && (
-                      <div className="flex flex-col items-end gap-1">
-                        <div className="flex gap-0.5">
-                          {[1, 2, 3, 4, 5].map((level) => (
-                            <div
-                              key={level}
-                              className={`h-2 w-5 rounded-full ${
-                                level <= Math.round(section.avgUnderstanding)
-                                  ? section.avgUnderstanding >= 4 ? "bg-teal" : section.avgUnderstanding >= 3 ? "bg-orange" : "bg-red-400"
-                                  : "bg-gray-200"
-                              }`}
-                            />
+            <div className="app-scroll flex-1 overflow-y-auto p-5">
+              <p className="text-sm text-muted">질문 데이터를 기반으로 이해도가 낮은 단원을 보여줍니다.</p>
+              {weakLoading ? (
+                <div className="mt-6 text-sm text-muted animate-pulse">분석 중...</div>
+              ) : weakSections.length === 0 ? (
+                <div className="mt-6 rounded-[20px] border border-line bg-surface-strong p-4 text-center">
+                  <p className="text-sm text-muted">질문을 더 보내면 약점 리포트가 생성됩니다.</p>
+                </div>
+              ) : (
+                <div className="mt-6 space-y-3">
+                  {weakSections.map((section) => (
+                    <div key={section.sectionTitle} className="rounded-[20px] border border-line bg-white p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-navy">{section.sectionTitle}</p>
+                          <p className="mt-1 text-xs text-muted">질문 {section.questionCount}건</p>
+                        </div>
+                        {section.avgUnderstanding > 0 && (
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="flex gap-0.5">
+                              {[1, 2, 3, 4, 5].map((level) => (
+                                <div
+                                  key={level}
+                                  className={`h-2 w-5 rounded-full ${
+                                    level <= Math.round(section.avgUnderstanding)
+                                      ? section.avgUnderstanding >= 4 ? "bg-teal" : section.avgUnderstanding >= 3 ? "bg-orange" : "bg-red-400"
+                                      : "bg-gray-200"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-[10px] text-muted">평균 이해도 {section.avgUnderstanding}</span>
+                          </div>
+                        )}
+                      </div>
+                      {section.misconceptions.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {section.misconceptions.slice(0, 3).map((m) => (
+                            <span key={m} className="rounded-full bg-orange/10 px-2.5 py-1 text-[11px] font-medium text-orange">{m}</span>
                           ))}
                         </div>
-                        <span className="text-[10px] text-muted">
-                          평균 이해도 {section.avgUnderstanding}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  {section.misconceptions.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {section.misconceptions.slice(0, 3).map((m) => (
-                        <span
-                          key={m}
-                          className="rounded-full bg-orange/10 px-2.5 py-1 text-[11px] font-medium text-orange"
-                        >
-                          {m}
-                        </span>
-                      ))}
+                      )}
                     </div>
-                  )}
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
-          )}
-        </section>
+          </aside>
+        </div>
       )}
     </div>
   );
