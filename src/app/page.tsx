@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Logo } from "@/components/logo";
 
 type Phase = "pre" | "title" | "tagline" | "end";
 
@@ -29,10 +30,10 @@ export default function Home() {
     <main className="fixed inset-0 flex items-center justify-center overflow-hidden px-6">
       <div className="relative flex w-full max-w-4xl items-center justify-center">
         <h1
-          className="display-title absolute text-center text-5xl leading-[1.05] text-navy transition-opacity duration-[700ms] ease-out sm:text-7xl lg:text-[5.5rem]"
+          className="absolute text-center transition-opacity duration-[700ms] ease-out"
           style={{ opacity: phase === "title" ? 1 : 0 }}
         >
-          ProofLoop
+          <Logo className="text-5xl leading-[1.05] sm:text-7xl lg:text-[5.5rem]" />
         </h1>
 
         <p
