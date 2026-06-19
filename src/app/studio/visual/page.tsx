@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { SectionHeader } from "@/components/studio-ui";
@@ -31,21 +31,30 @@ export default function VisualPage() {
   const [prompt, setPrompt] = useState(PRESETS.diagram[0].prompt);
   const [result, setResult] = useState<VisualResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const didInit = useRef(false);
 
   useEffect(() => {
     if (isLoading) return;
     if (!user) router.replace("/studio/login");
   }, [user, isLoading, router]);
 
+  // 첫 진입 시 자동으로 하나 생성해서 결과 영역이 비어있지 않게
+  useEffect(() => {
+    if (isLoading || !user || didInit.current) return;
+    didInit.current = true;
+    generate(kind, prompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, user]);
+
   if (isLoading || !user) return null;
 
-  async function generate() {
+  async function generate(k: VisualKind = kind, p: string = prompt) {
     setBusy(true);
     try {
       const res = await fetch("/api/visual", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ kind, prompt }),
+        body: JSON.stringify({ kind: k, prompt: p }),
       });
       setResult(await res.json());
     } finally { setBusy(false); }
@@ -54,7 +63,7 @@ export default function VisualPage() {
   function pickKind(k: VisualKind) {
     setKind(k);
     setPrompt(PRESETS[k][0].prompt);
-    setResult(null);
+    generate(k, PRESETS[k][0].prompt); // 탭 전환 시 즉시 생성
   }
 
   return (
@@ -67,7 +76,7 @@ export default function VisualPage() {
         <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-navy sm:text-3xl">개념 시각화</h2>
         <p className="mt-2 max-w-3xl text-sm leading-7 text-muted">
           부력·밀도·화학반응 같은 시각적 개념을 다이어그램·그래프·만화로 즉시 생성합니다.
-          NC AI VARCO의 멀티모달 에셋 생성 API를 사용합니다.
+          현재는 규칙기반 SVG 엔진으로 생성하며, NC AI VARCO 멀티모달 연동을 준비 중입니다.
         </p>
       </header>
 
@@ -92,7 +101,7 @@ export default function VisualPage() {
             <button
               key={p.prompt}
               type="button"
-              onClick={() => setPrompt(p.prompt)}
+              onClick={() => { setPrompt(p.prompt); generate(kind, p.prompt); }}
               className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                 prompt === p.prompt ? "bg-teal/10 text-teal" : "border border-line bg-surface-strong text-muted"
               }`}
@@ -107,12 +116,13 @@ export default function VisualPage() {
             type="text"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="개념 또는 수식 입력"
+            onKeyDown={(e) => { if (e.key === "Enter") generate(); }}
+            placeholder="개념 또는 수식 입력 후 Enter"
             className="flex-1 min-w-[240px] rounded-[16px] border border-line bg-white px-4 py-3 text-sm outline-none focus:border-teal"
           />
           <button
             type="button"
-            onClick={generate}
+            onClick={() => generate()}
             disabled={busy}
             className="rounded-full bg-orange px-5 py-3 text-sm font-semibold text-white transition-transform hover:-translate-y-0.5 disabled:opacity-60"
           >
@@ -125,8 +135,8 @@ export default function VisualPage() {
         <section className="app-panel rounded-[28px] p-5 sm:p-6">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <SectionHeader kicker={result.kind === "graph" ? "수학 그래프" : result.kind === "comic" ? "학습 만화" : "개념 다이어그램"} title={result.prompt} copy={result.description} />
-            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${result.mode === "live_ai" ? "bg-teal/10 text-teal" : "bg-amber/16 text-amber"}`}>
-              {result.mode === "live_ai" ? `LIVE · ${result.modelName}` : `DEMO · ${result.modelName}`}
+            <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${result.mode === "live_ai" ? "bg-teal/10 text-teal" : "bg-navy/8 text-navy/70"}`}>
+              {result.mode === "live_ai" ? `LIVE · ${result.modelName}` : "자동 생성 · 규칙기반 SVG"}
             </span>
           </div>
 
@@ -149,7 +159,7 @@ export default function VisualPage() {
 
           {result.kind === "diagram" && (
             <p className="mt-4 rounded-[16px] border border-orange/30 bg-orange/5 p-4 text-xs text-muted">
-              💡 본선 단계에서 NC VARCO API 키 발급 후 → 진짜 멀티모달 일러스트 자동 생성으로 전환됩니다. 현재는 SVG 폴백.
+              💡 지금은 규칙기반 SVG 엔진으로 즉시 생성합니다. NC VARCO 연동 시 멀티모달 일러스트로 전환됩니다.
             </p>
           )}
         </section>
