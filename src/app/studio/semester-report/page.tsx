@@ -221,6 +221,7 @@ export default function SemesterReportPage() {
             </div>
           </section>
 
+          <div className="grid gap-4 xl:grid-cols-2">
           <section className="app-panel rounded-[28px] p-5 sm:p-6">
             <SectionHeader
               kicker="학습 부채"
@@ -287,6 +288,7 @@ export default function SemesterReportPage() {
               </button>
             </div>
           </section>
+          </div>
         </>
       )}
     </div>

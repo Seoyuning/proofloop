@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useStudio } from "@/lib/studio-context";
 import { MessageBubble, SectionHeader } from "@/components/studio-ui";
@@ -78,9 +78,10 @@ export default function StudentChatPage() {
   const { user, isLoading } = useAuth();
   const {
     currentBot, chatInput, setChatInput, chatMessages, chatLoading, handleSendQuestion,
-    activeClassId, activeClassSubject,
+    activeClassId, activeClassSubject, switchBotForClass,
     chatSessions, activeChatSessionId, handleNewChatSession, handleSwitchSession,
   } = useStudio();
+  const didHealClass = useRef(false);
   const [showSessions, setShowSessions] = useState(false);
   const [weakSections, setWeakSections] = useState<WeakSection[]>([]);
   const [weakLoading, setWeakLoading] = useState(false);
@@ -90,6 +91,28 @@ export default function StudentChatPage() {
     if (!user) { router.replace("/studio/login"); return; }
     if (user.role !== "student") { router.replace("/studio/analysis"); }
   }, [user, isLoading, router]);
+
+  // Self-heal: 사이드바가 active class를 못 채운 경우, 채팅 페이지가 직접 참여한 반을 확인해 선택.
+  // (반에 참여했는데도 "반에 참여하세요"가 뜨는 버그 방지)
+  useEffect(() => {
+    if (activeClassId || didHealClass.current) return;
+    didHealClass.current = true;
+    fetch("/api/classes")
+      .then((r) => r.json())
+      .then((d) => {
+        const cls = d.classes?.[0];
+        if (cls) {
+          switchBotForClass({
+            id: cls.id,
+            subject: cls.subject ?? "",
+            grade: cls.grade ?? "",
+            publisher: cls.publisher ?? "",
+            textbookName: cls.textbook_name ?? "",
+          });
+        }
+      })
+      .catch(() => {});
+  }, [activeClassId, switchBotForClass]);
 
   // Load weakness report when class changes
   useEffect(() => {

@@ -16,6 +16,7 @@ export default function CurriculumPage() {
   const [exam, setExam] = useState<ExamDraft | null>(null);
   const [genPri, setGenPri] = useState(false);
   const [genExam, setGenExam] = useState(false);
+  const [tab, setTab] = useState<"plan" | "exam">("plan");
 
   useEffect(() => {
     if (isLoading) return;
@@ -62,7 +63,26 @@ export default function CurriculumPage() {
         </p>
       </header>
 
+      {/* 탭 전환 */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setTab("plan")}
+          className={`rounded-full px-5 py-2.5 text-sm font-semibold transition-all ${tab === "plan" ? "bg-navy text-white shadow-lg" : "border border-line bg-white text-foreground hover:border-teal/40"}`}
+        >
+          학습 계획
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("exam")}
+          className={`rounded-full px-5 py-2.5 text-sm font-semibold transition-all ${tab === "exam" ? "bg-navy text-white shadow-lg" : "border border-line bg-white text-foreground hover:border-teal/40"}`}
+        >
+          시험 초안
+        </button>
+      </div>
+
       {/* 학습 우선순위 + 커리큘럼 */}
+      {tab === "plan" && (
       <section className="app-panel rounded-[28px] p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SectionHeader
@@ -98,7 +118,7 @@ export default function CurriculumPage() {
               </span>
             </div>
 
-            <div className="grid gap-3">
+            <div className="grid gap-3 xl:grid-cols-2">
               {priorities.topPriorities.map((p) => (
                 <div key={p.rank} className="rounded-[20px] border border-line bg-white p-4">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -130,8 +150,10 @@ export default function CurriculumPage() {
           </div>
         )}
       </section>
+      )}
 
       {/* 시험 초안 */}
+      {tab === "exam" && (
       <section className="app-panel rounded-[28px] p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SectionHeader
@@ -158,7 +180,7 @@ export default function CurriculumPage() {
               </span>
             </div>
 
-            <div className="grid gap-3">
+            <div className="grid gap-3 xl:grid-cols-2">
               {exam.items.map((item) => (
                 <div key={item.number} className="rounded-[20px] border border-line bg-white p-4">
                   <div className="flex flex-wrap items-baseline gap-2 mb-2">
@@ -179,6 +201,7 @@ export default function CurriculumPage() {
           </div>
         )}
       </section>
+      )}
     </div>
   );
 }
