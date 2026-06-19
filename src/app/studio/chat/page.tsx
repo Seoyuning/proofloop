@@ -61,20 +61,6 @@ function ChatOnboarding({
       {!canAsk && (
         <p className="text-center text-xs text-muted">반에 참여하면 바로 질문할 수 있어요.</p>
       )}
-
-      {/* 답변 예시 — 핵심 가치 미리보기 */}
-      <div className="mt-2 rounded-[20px] border border-line bg-white/72 p-4">
-        <div className="flex items-center gap-2">
-          <span className="rounded-full bg-orange/10 px-2.5 py-1 text-[11px] font-semibold text-orange">예시</span>
-          <p className="text-sm font-semibold text-navy">답변은 이렇게 옵니다</p>
-        </div>
-        <p className="mt-3 text-sm leading-7 text-navy">
-          (x-p)²은 항상 0 이상이라 x=p일 때 최소가 되고, 그때 y=q예요. 그래서 꼭짓점이 (p, q)입니다.
-        </p>
-        <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-teal/10 px-3 py-1 text-xs font-semibold text-teal">
-          📎 근거 · 3단원 이차함수 / p.84
-        </div>
-      </div>
     </div>
   );
 }
