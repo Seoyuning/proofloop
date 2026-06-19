@@ -176,6 +176,12 @@ export function StudioProvider({ children }: { children: ReactNode }) {
       ],
       sections: matchedSeed?.sections ?? [],
     };
+    // 동적 반 봇을 allBots에 등록해야 currentBot 조회가 emptyBot으로 폴백되지 않음
+    setCustomBots((prev) =>
+      prev.some((b) => b.id === dynBot.id)
+        ? prev.map((b) => (b.id === dynBot.id ? dynBot : b))
+        : [...prev, dynBot]
+    );
     setActiveClassId(cls.id);
     setActiveClassSubject(cls.subject);
     handleBotChange(dynBot);

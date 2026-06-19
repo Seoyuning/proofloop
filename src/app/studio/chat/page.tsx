@@ -40,19 +40,20 @@ function ChatOnboarding({
         <p className="mt-1 text-xs text-muted">
           {canAsk ? "아래를 누르면 질문칸에 채워집니다." : "반에 참여하면 바로 질문할 수 있어요."}
         </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {starterPrompts.map((prompt) => (
-            <button
-              key={prompt}
-              type="button"
-              disabled={!canAsk}
-              onClick={() => onPick(prompt)}
-              className="rounded-full border border-teal/30 bg-teal/5 px-3.5 py-2 text-xs font-medium text-teal transition-colors hover:bg-teal/12 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {prompt}
-            </button>
-          ))}
-        </div>
+        {canAsk && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {starterPrompts.map((prompt) => (
+              <button
+                key={prompt}
+                type="button"
+                onClick={() => onPick(prompt)}
+                className="rounded-full border border-teal/30 bg-teal/5 px-3.5 py-2 text-xs font-medium text-teal transition-colors hover:bg-teal/12"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 답변 예시 — 핵심 가치(근거 기반 답변) 미리보기 */}
