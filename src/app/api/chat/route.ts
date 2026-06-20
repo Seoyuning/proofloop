@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { AIProviderError, getChatProvider } from "@/lib/ai";
+import { AIProviderError, getProvider, friendlyModelName } from "@/lib/ai";
+import { routeStudentMessage } from "@/lib/ai/orchestrator";
 
 interface ChatRequestBody {
   question: string;
@@ -123,15 +124,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 });
   }
 
-  const provider = getChatProvider();
-
-  if (!provider) {
-    return NextResponse.json(
-      { error: "AI 채팅 모델이 설정되지 않았습니다. AI_PROVIDER 환경변수를 확인하세요." },
-      { status: 500 }
-    );
-  }
-
   const body: ChatRequestBody = await request.json().catch(() => null);
   if (!body?.question || !body?.sections) {
     return NextResponse.json(
@@ -139,6 +131,25 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
+
+  // 오케스트레이터: 질문을 분석해 적절한 모델로 라우팅 (A.X K1, 없으면 규칙기반)
+  const decision = await routeStudentMessage(body.question);
+  const provider = getProvider(decision.useCase);
+
+  if (!provider) {
+    return NextResponse.json(
+      { error: "AI 채팅 모델이 설정되지 않았습니다. AI 키(UPSTAGE/FRIENDLI 등) 환경변수를 확인하세요." },
+      { status: 500 }
+    );
+  }
+
+  // 실제 사용된 모델명(폴백 반영) — 표시용
+  const routing = {
+    router: decision.router,
+    label: decision.label,
+    model: friendlyModelName(provider.name),
+    reason: decision.reason,
+  };
 
   const systemPrompt = buildSystemPrompt(body);
 
@@ -244,5 +255,6 @@ export async function POST(request: Request) {
     followUp: followUp,
     understanding: understanding || null,
     sessionId: resolvedSessionId,
+    routing,
   });
 }

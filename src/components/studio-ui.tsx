@@ -8,6 +8,7 @@ export type ChatMessage = {
   followUp?: string;
   unitLabel?: string;
   understanding?: number | null;
+  routing?: { router: string; label: string; model: string; reason: string };
 };
 
 export function SectionHeader({
@@ -89,6 +90,12 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
     <div className="flex gap-3">
       <div className="mt-1 flex h-7 w-7 flex-none items-center justify-center rounded-full bg-navy text-[11px] font-bold text-white">P</div>
       <div className="min-w-0 flex-1 space-y-3">
+        {message.routing ? (
+          <div className="inline-flex flex-wrap items-center gap-1.5 rounded-full bg-navy/5 px-2.5 py-1 text-[11px] font-medium text-navy/70" title={message.routing.reason}>
+            <span>🧭 {message.routing.router} → {message.routing.model}</span>
+            <span className="text-muted/60">· {message.routing.label}</span>
+          </div>
+        ) : null}
         <p className="whitespace-pre-wrap text-[15px] leading-8 text-foreground">{displayText}</p>
 
         {message.unitLabel ? (

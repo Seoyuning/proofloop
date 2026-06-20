@@ -125,3 +125,20 @@ export function getProvider(useCase: UseCase): AIProvider | null {
 // Backwards-compatible thin wrappers
 export function getChatProvider(): AIProvider | null { return getProvider("chat"); }
 export function getDiagnosisProvider(): AIProvider | null { return getProvider("diagnosis"); }
+
+// A.X K1 오케스트레이터 — SKT 전용(폴백 없음). 없으면 null → 규칙기반 라우팅으로 폴백.
+export function getOrchestratorProvider(): AIProvider | null {
+  const env = envFor("skt");
+  return env ? build(env) : null;
+}
+
+// provider.name(kind) → 사람이 읽는 모델명
+export function friendlyModelName(name: string): string {
+  switch (name) {
+    case "lg-exaone": return "LG EXAONE";
+    case "upstage-solar": return "Upstage Solar";
+    case "kt-midm": return "KT Mi:dm";
+    case "skt": return "SKT A.X K1";
+    default: return name;
+  }
+}

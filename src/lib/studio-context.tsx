@@ -396,6 +396,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
               evidence: evidence.length > 0 ? evidence : undefined,
               followUp: data.followUp || undefined,
               understanding: data.understanding || null,
+              routing: data.routing || undefined,
             },
           ]);
 
