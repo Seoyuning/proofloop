@@ -77,6 +77,7 @@ export default function StudentChatPage() {
   const [myClasses, setMyClasses] = useState<ClassRow[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrNote, setOcrNote] = useState<string | null>(null);
   const [showSessions, setShowSessions] = useState(false);
@@ -123,6 +124,12 @@ export default function StudentChatPage() {
       .catch(() => setWeakSections([]))
       .finally(() => setWeakLoading(false));
   }, [activeClassId]);
+
+  // 새 메시지/로딩 시 항상 맨 아래로 부드럽게 스크롤 (위로 스크롤한 상태에서 보내도 따라 내려감)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [chatMessages.length, chatLoading]);
 
   if (isLoading || !user || user.role !== "student") return null;
 
@@ -259,7 +266,7 @@ export default function StudentChatPage() {
       </div>
 
       {/* 메시지 — 플랫, 가운데 정렬 컬럼 */}
-      <div className="app-scroll flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="app-scroll flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-3xl space-y-6 px-1 py-3">
           {hasConversation ? (
             recentMessages.map((message) => <MessageBubble key={message.id} message={message} />)
