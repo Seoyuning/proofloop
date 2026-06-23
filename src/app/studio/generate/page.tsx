@@ -75,6 +75,21 @@ function ExportButtons({ text, filename }: { text: string; filename: string }) {
   );
 }
 
+type TeacherPracticeItem = { type: string; question: string; choices?: string[]; answer: string; solution: string };
+type TeacherPracticeSet = { id: string; concept: string | null; grade_key: string | null; created_at: string; items: TeacherPracticeItem[]; attempts: number; correct: number };
+
+function formatPracticeSet(s: TeacherPracticeSet): string {
+  let t = `[맞춤 연습문제] ${s.concept || "수학"}\n\n`;
+  s.items.forEach((it, i) => {
+    t += `${i + 1}. ${it.question}\n`;
+    if (it.choices?.length) it.choices.forEach((c, ci) => { t += `  ${ci + 1}) ${c}\n`; });
+    t += `  정답: ${it.answer}\n`;
+    if (it.solution) t += `  풀이: ${it.solution}\n`;
+    t += "\n";
+  });
+  return t;
+}
+
 function TeacherModeButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return (
     <button
@@ -92,16 +107,25 @@ export default function TeacherGeneratePage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const {
-    currentBot, teacherMode, setTeacherMode,
+    currentBot, teacherMode, setTeacherMode, activeClassId,
     lessonUnitIds, setLessonUnitIds, lessonFocus, setLessonFocus, lessonMinutes, setLessonMinutes, lessonKit, handleLessonGenerate,
     examUnitIds, setExamUnitIds, examPurpose, setExamPurpose, examQuestionCount, setExamQuestionCount, examDraft, handleExamGenerate,
   } = useStudio();
+  const [practiceSets, setPracticeSets] = useState<TeacherPracticeSet[]>([]);
 
   useEffect(() => {
     if (isLoading) return;
     if (!user) { router.replace("/studio/login"); return; }
     if (user.role !== "teacher") { router.replace("/studio/chat"); }
   }, [user, isLoading, router]);
+
+  useEffect(() => {
+    if (!activeClassId) { setPracticeSets([]); return; }
+    fetch(`/api/practice/sets?classId=${activeClassId}`)
+      .then((r) => r.json())
+      .then((d) => setPracticeSets(Array.isArray(d.sets) ? d.sets : []))
+      .catch(() => setPracticeSets([]));
+  }, [activeClassId]);
 
   if (isLoading || !user || user.role !== "teacher") return null;
 
@@ -130,6 +154,48 @@ export default function TeacherGeneratePage() {
           </div>
         </div>
       </header>
+
+      {practiceSets.length > 0 && (
+        <section className="app-panel rounded-[28px] p-5 sm:p-6">
+          <SectionHeader
+            kicker="학생 연습 데이터"
+            title="학생이 푼 맞춤 연습문제"
+            copy="챗봇이 학생 약점에 맞춰 출제한 문제와 정답률입니다. 시험·복습 자료로 바로 활용하세요."
+          />
+          <div className="app-scroll mt-6 max-h-[520px] space-y-3 overflow-y-auto pr-1">
+            {practiceSets.map((s) => (
+              <div key={s.id} className="rounded-[22px] border border-line bg-white/72 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-navy">{s.concept || "수학 연습"}</p>
+                    <p className="mt-1 text-xs text-muted">{s.grade_key || ""} · 문제 {s.items.length}개 · {new Date(s.created_at).toLocaleDateString("ko-KR")}</p>
+                  </div>
+                  {s.attempts > 0 && (
+                    <span className="whitespace-nowrap rounded-full bg-teal/10 px-3 py-1 text-xs font-semibold text-teal">정답 {s.correct}/{s.attempts}</span>
+                  )}
+                </div>
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-xs font-semibold text-navy/70">문제·정답 보기</summary>
+                  <div className="mt-2 space-y-2">
+                    {s.items.map((it, i) => (
+                      <div key={i} className="rounded-[14px] border border-line bg-surface-strong p-3">
+                        <p className="text-sm text-navy">{i + 1}. {it.question}</p>
+                        {it.choices && it.choices.length > 0 && (
+                          <p className="mt-1 text-xs text-muted">보기: {it.choices.join(" / ")}</p>
+                        )}
+                        <p className="mt-1 text-xs font-medium text-teal">정답: {it.answer}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-3">
+                    <ExportButtons text={formatPracticeSet(s)} filename={`연습문제_${s.concept || "수학"}.txt`} />
+                  </div>
+                </details>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {teacherMode === "lesson" ? (
         <div className="space-y-4">

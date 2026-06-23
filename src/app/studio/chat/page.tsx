@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useStudio } from "@/lib/studio-context";
 import { MessageBubble } from "@/components/studio-ui";
+import { PracticePanel } from "@/components/practice-panel";
 
 type WeakSection = {
   sectionTitle: string;
@@ -84,6 +85,8 @@ export default function StudentChatPage() {
   const [weaknessOpen, setWeaknessOpen] = useState(false);
   const [weakSections, setWeakSections] = useState<WeakSection[]>([]);
   const [weakLoading, setWeakLoading] = useState(false);
+  const [practiceConcept, setPracticeConcept] = useState<string | null>(null);
+  const [dismissedSuggestKey, setDismissedSuggestKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (isLoading) return;
@@ -131,10 +134,33 @@ export default function StudentChatPage() {
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
   }, [chatMessages.length, chatLoading]);
 
+  // 반/세션 바뀌면 연습 패널 닫기
+  useEffect(() => {
+    setPracticeConcept(null);
+    setDismissedSuggestKey(null);
+  }, [activeClassId, activeChatSessionId]);
+
   if (isLoading || !user || user.role !== "student") return null;
 
   const recentMessages = chatMessages.slice(-12);
   const hasConversation = chatMessages.some((m) => m.role === "user");
+
+  // 이해도 상승 추세 감지 → 연습문제 제안
+  const assistantWithU = chatMessages.filter(
+    (m) => m.role === "assistant" && typeof m.understanding === "number" && (m.understanding as number) > 0,
+  );
+  const lastA = assistantWithU[assistantWithU.length - 1];
+  const prevA = assistantWithU[assistantWithU.length - 2];
+  const rising = !!lastA && (lastA.understanding as number) >= 4 && (!prevA || (lastA.understanding as number) >= (prevA.understanding as number));
+  const suggestKey = lastA?.id ?? "";
+  function deriveConcept(): string {
+    if (lastA?.evidence?.[0]?.unitTitle) return lastA.evidence[0].unitTitle;
+    if (lastA?.sources?.[0]?.title) return lastA.sources[0].title;
+    const lastUser = [...chatMessages].reverse().find((m) => m.role === "user");
+    const t = (lastUser?.text || "").trim();
+    return t.length > 24 ? `${t.slice(0, 24)}…` : t || currentBot.subject || "수학";
+  }
+  const showSuggestion = rising && !practiceConcept && !!activeClassId && dismissedSuggestKey !== suggestKey && !chatLoading;
 
   function resizeInput() {
     const el = inputRef.current;
@@ -284,6 +310,26 @@ export default function StudentChatPage() {
               <div className="mt-1 flex h-7 w-7 flex-none items-center justify-center rounded-full bg-navy text-[11px] font-bold text-white">P</div>
               <p className="pt-1 text-sm text-muted animate-pulse">답변을 생각하고 있어요…</p>
             </div>
+          )}
+
+          {showSuggestion && (
+            <div className="rounded-[20px] border border-teal/30 bg-teal/8 p-4">
+              <p className="text-sm font-semibold text-navy">이해도가 올라왔어요! 💪</p>
+              <p className="mt-1 text-sm text-muted">&ldquo;{deriveConcept()}&rdquo; 개념으로 비슷한 문제 3개 풀어볼까요?</p>
+              <div className="mt-3 flex gap-2">
+                <button type="button" onClick={() => setPracticeConcept(deriveConcept())} className="rounded-full bg-orange px-4 py-2 text-xs font-semibold text-white transition-all hover:-translate-y-0.5">풀어보기</button>
+                <button type="button" onClick={() => setDismissedSuggestKey(suggestKey)} className="rounded-full border border-line bg-white px-4 py-2 text-xs font-semibold text-muted hover:border-teal">다음에</button>
+              </div>
+            </div>
+          )}
+
+          {practiceConcept && activeClassId && (
+            <PracticePanel
+              classId={activeClassId}
+              concept={practiceConcept}
+              sessionId={activeChatSessionId}
+              onClose={() => { setPracticeConcept(null); setDismissedSuggestKey(suggestKey); }}
+            />
           )}
         </div>
       </div>

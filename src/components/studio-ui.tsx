@@ -1,10 +1,13 @@
 import type { ExamDraft, GroundedEvidence } from "@/lib/studio-generation";
 
+export type MaterialSource = { title: string; page?: number | null; snippet: string };
+
 export type ChatMessage = {
   id: string;
   role: "assistant" | "user";
   text: string;
   evidence?: GroundedEvidence[];
+  sources?: MaterialSource[];
   followUp?: string;
   unitLabel?: string;
   understanding?: number | null;
@@ -108,6 +111,18 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
               <div key={`${evidence.unitTitle}-${evidence.pages}`} className="rounded-[16px] border border-line bg-surface-strong p-3">
                 <p className="text-sm font-semibold text-navy">📎 {evidence.unitTitle} / {evidence.pages}</p>
                 <p className="mt-1.5 text-sm leading-6 text-muted">{evidence.reason}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {message.sources && message.sources.length > 0 ? (
+          <div className="grid gap-2">
+            <p className="text-xs font-semibold text-teal">📄 답변 근거 (선생님이 올린 학습자료)</p>
+            {message.sources.map((s, i) => (
+              <div key={`${s.title}-${i}`} className="rounded-[16px] border border-teal/20 bg-teal/5 p-3">
+                <p className="text-sm font-semibold text-navy">{s.title}{s.page ? ` · ${s.page}쪽` : ""}</p>
+                <p className="mt-1.5 whitespace-pre-wrap text-sm leading-6 text-muted">&ldquo;{s.snippet}&rdquo;</p>
               </div>
             ))}
           </div>

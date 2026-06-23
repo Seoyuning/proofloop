@@ -394,6 +394,7 @@ export function StudioProvider({ children }: { children: ReactNode }) {
               role: "assistant",
               text: data.answer,
               evidence: evidence.length > 0 ? evidence : undefined,
+              sources: Array.isArray(data.sources) && data.sources.length > 0 ? data.sources : undefined,
               followUp: data.followUp || undefined,
               understanding: data.understanding || null,
               routing: data.routing || undefined,

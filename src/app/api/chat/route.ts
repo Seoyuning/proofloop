@@ -2,6 +2,20 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { AIProviderError, getProvider, friendlyModelName } from "@/lib/ai";
 import { routeStudentMessage } from "@/lib/ai/orchestrator";
+import { embedQuery, isEmbeddingConfigured, toVectorLiteral } from "@/lib/ai/embeddings";
+
+// 검색된 학습자료 청크 (RAG)
+interface RetrievedChunk {
+  id: string;
+  material_id: string;
+  title: string;
+  content: string;
+  page: number | null;
+  similarity: number;
+}
+
+const RETRIEVE_COUNT = 6; // 프롬프트에 넣을 청크 수
+const DISPLAY_MIN_SIM = 0.3; // 근거 카드로 보여줄 최소 유사도
 
 interface ChatRequestBody {
   question: string;
@@ -79,6 +93,68 @@ ${sectionBlock}
 [후속 질문] 이어서 생각해볼 서술형 질문`;
 }
 
+// 업로드 학습자료(RAG)로 grounding 하는 시스템 프롬프트
+function buildMaterialSystemPrompt(botMeta: ChatRequestBody["botMeta"], chunks: RetrievedChunk[]): string {
+  const materialBlock = chunks
+    .map((c) => `[자료: ${c.title}${c.page ? ` ${c.page}쪽` : ""}]\n${c.content}`)
+    .join("\n\n---\n\n");
+
+  const subjectLine = botMeta.subject ? `과목: ${botMeta.subject}` : "";
+
+  return `당신은 ${botMeta.grade} ${botMeta.subject} 학습 챗봇이자 학습 코치입니다.
+${subjectLine}
+
+## 핵심 규칙
+1. 반드시 아래 [학습자료]에 적힌 내용에만 근거해 답하세요. 자료에 없는 내용은 절대 지어내지 말고 "올려주신 학습자료에서는 그 내용을 찾을 수 없어요. 선생님께 자료 보완을 요청해 보세요."라고 답하세요.
+2. 답변 근거가 된 자료의 제목과 쪽수를 함께 밝히세요.
+3. 학생이 가질 수 있는 오개념을 미리 짚어주고 올바른 이해로 안내하세요.
+4. 한국어로 답하세요. 친절하지만 간결하게, 자료 근거에 충실하게 답하세요.
+5. 수학 기호는 LaTeX나 $기호 없이 일반 텍스트로 쓰세요. 예: "y = a(x-p)^2 + q", "루트 3". 절대로 $, \\frac, \\cos, \\theta 같은 LaTeX 문법을 사용하지 마세요.
+6. 마크다운 문법(**굵게**, *기울임*, # 제목 등)을 절대 사용하지 마세요. 일반 텍스트로만 답하세요.
+
+## 과제 대행 감지 & 학습 유도
+- 학생이 답을 직접 요구하면 바로 답을 주지 말고, 핵심 개념을 설명한 뒤 서술형 확인 질문을 1개 내세요.
+- 서술형 질문은 찍어서 맞출 수 없는 형태여야 합니다.
+
+## 이해도 평가
+매 답변에서 학생의 이해 수준을 1~5단계로 판단하세요. (1 매우 부족 ~ 5 우수)
+
+## 학습자료 (질문과 관련해 검색된 부분)
+
+${materialBlock}
+
+## 답변 형식
+답변 본문을 먼저 쓰고, 맨 마지막에 다음 태그들을 각각 한 줄에 적어주세요:
+[근거] 자료명 / 쪽수
+[이해도] 1~5 (숫자만)
+[후속 질문] 이어서 생각해볼 서술형 질문`;
+}
+
+// 질문을 임베딩해 반 학습자료에서 관련 청크를 검색 (없거나 실패하면 빈 배열)
+async function retrieveChunks(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  classId: string,
+  question: string,
+): Promise<RetrievedChunk[]> {
+  if (!isEmbeddingConfigured()) return [];
+  try {
+    const qvec = await embedQuery(question);
+    const { data, error } = await supabase.rpc("match_material_chunks", {
+      p_class_id: classId,
+      query_embedding: toVectorLiteral(qvec),
+      match_count: RETRIEVE_COUNT,
+    });
+    if (error) {
+      console.error("[chat] match_material_chunks error:", error.message);
+      return [];
+    }
+    return (data ?? []) as RetrievedChunk[];
+  } catch (e) {
+    console.error("[chat] retrieval failed:", e);
+    return [];
+  }
+}
+
 // GET: load chat history for a class, optionally filtered by sessionId
 export async function GET(request: Request) {
   const supabase = await createClient();
@@ -151,7 +227,15 @@ export async function POST(request: Request) {
     reason: decision.reason,
   };
 
-  const systemPrompt = buildSystemPrompt(body);
+  // RAG: 업로드된 학습자료가 있으면 그걸 근거로, 없으면 시드 교과서 단원으로 grounding
+  let retrieved: RetrievedChunk[] = [];
+  if (body.classId) {
+    retrieved = await retrieveChunks(supabase, body.classId, body.question);
+  }
+  const useMaterials = retrieved.length > 0;
+  const systemPrompt = useMaterials
+    ? buildMaterialSystemPrompt(body.botMeta, retrieved)
+    : buildSystemPrompt(body);
 
   const recentHistory = body.history.slice(-10);
   const messages = [
@@ -249,9 +333,23 @@ export async function POST(request: Request) {
     }
   }
 
+  // 근거 스니펫(실제 검색된 자료 원문) — 학생/교사가 직접 검증 가능
+  const sources = useMaterials
+    ? retrieved
+        .filter((c) => (c.similarity ?? 0) >= DISPLAY_MIN_SIM)
+        .slice(0, 3)
+        .map((c) => ({
+          title: c.title,
+          page: c.page,
+          snippet: c.content.length > 240 ? `${c.content.slice(0, 240)}…` : c.content,
+        }))
+    : [];
+
   return NextResponse.json({
     answer: mainAnswer.trim(),
-    evidence: evidenceStr,
+    evidence: useMaterials ? "" : evidenceStr,
+    sources,
+    grounding: useMaterials ? "material" : "textbook",
     followUp: followUp,
     understanding: understanding || null,
     sessionId: resolvedSessionId,

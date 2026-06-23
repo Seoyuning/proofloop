@@ -13,12 +13,14 @@ const SAMPLE_CLUSTERS = [
   { q: "완전제곱식 만들 때 더하고 빼는 게 헷갈려요", unit: "3단원 이차함수", freq: 6, misconception: "상수항 보정(±) 누락" },
 ];
 
-interface UploadedMaterial {
+interface StoredMaterial {
   id: string;
-  name: string;
-  type: "image" | "file";
-  url: string;
-  addedAt: string;
+  title: string;
+  source_kind: "image" | "file";
+  chunk_count: number;
+  page_count: number | null;
+  parse_mode: string | null;
+  created_at: string;
 }
 
 type AnalysisTab = "class" | "student";
@@ -59,22 +61,49 @@ export default function TeacherAnalysisPage() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
-  const [materials, setMaterials] = useState<UploadedMaterial[]>([]);
+  const [materials, setMaterials] = useState<StoredMaterial[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [showUploadMenu, setShowUploadMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  function handleFileSelected(files: FileList | null) {
-    if (!files) return;
-    const newMaterials: UploadedMaterial[] = Array.from(files).map((f) => ({
-      id: `mat-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      name: f.name,
-      type: f.type.startsWith("image/") ? "image" : "file",
-      url: URL.createObjectURL(f),
-      addedAt: new Date().toLocaleString("ko-KR"),
-    }));
-    setMaterials((prev) => [...newMaterials, ...prev]);
+  function fetchMaterials(classId: string) {
+    fetch(`/api/materials?classId=${classId}`)
+      .then((r) => r.json())
+      .then((d) => setMaterials(Array.isArray(d.materials) ? d.materials : []))
+      .catch(() => setMaterials([]));
+  }
+
+  async function handleFileSelected(files: FileList | null) {
     setShowUploadMenu(false);
+    if (!files || files.length === 0) return;
+    if (!activeClassId) {
+      setUploadError("먼저 사이드바에서 반을 선택하세요.");
+      return;
+    }
+    setUploading(true);
+    setUploadError(null);
+    try {
+      for (const f of Array.from(files)) {
+        const fd = new FormData();
+        fd.append("file", f);
+        fd.append("classId", activeClassId);
+        fd.append("kind", f.type.startsWith("image/") ? "image" : "file");
+        const res = await fetch("/api/materials", { method: "POST", body: fd });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) setUploadError(data.error || `${f.name} 업로드 실패`);
+      }
+      fetchMaterials(activeClassId);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleDeleteMaterial(id: string) {
+    fetch(`/api/materials?id=${id}`, { method: "DELETE" })
+      .then(() => { if (activeClassId) fetchMaterials(activeClassId); })
+      .catch(() => {});
   }
 
   useEffect(() => {
@@ -92,6 +121,12 @@ export default function TeacherAnalysisPage() {
       .then((d) => setMembers(Array.isArray(d.members) ? d.members : []))
       .catch(() => setMembers([]))
       .finally(() => setMembersLoading(false));
+  }, [activeClassId]);
+
+  // 활성 반의 저장된 학습자료 (RAG 근거)
+  useEffect(() => {
+    if (!activeClassId) { setMaterials([]); return; }
+    fetchMaterials(activeClassId);
   }, [activeClassId]);
 
   useEffect(() => {
@@ -293,10 +328,11 @@ export default function TeacherAnalysisPage() {
               <div className="relative">
                 <button
                   type="button"
-                  className="whitespace-nowrap rounded-full bg-navy px-5 py-3 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-teal"
+                  disabled={uploading}
+                  className="whitespace-nowrap rounded-full bg-navy px-5 py-3 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-teal disabled:opacity-50"
                   onClick={() => setShowUploadMenu(!showUploadMenu)}
                 >
-                  + 자료 추가
+                  {uploading ? "처리 중…" : "+ 자료 추가"}
                 </button>
                 {showUploadMenu && (
                   <div className="absolute right-0 top-full z-20 mt-2 w-48 rounded-[18px] border border-line bg-white p-2 shadow-xl">
@@ -319,19 +355,29 @@ export default function TeacherAnalysisPage() {
               </div>
             </div>
 
-            {materials.length > 0 && (
+            {uploadError && (
+              <p className="mt-3 rounded-[14px] border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-600">{uploadError}</p>
+            )}
+
+            {(materials.length > 0 || uploading) && (
               <div className="mt-4 space-y-2">
-                <p className="text-xs font-semibold text-muted">추가된 학습 자료</p>
+                <p className="text-xs font-semibold text-muted">올린 학습 자료 — 학생 챗봇 답변의 근거(RAG)로 사용됩니다</p>
+                {uploading && (
+                  <p className="rounded-[16px] border border-dashed border-teal/30 bg-teal/5 p-3 text-sm text-teal animate-pulse">자료를 분석·색인하는 중…</p>
+                )}
                 {materials.map((mat) => (
                   <div key={mat.id} className="flex items-center justify-between rounded-[16px] border border-line bg-surface-strong p-3">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-base">{mat.type === "image" ? "🖼️" : "📄"}</span>
+                      <span className="text-base">{mat.source_kind === "image" ? "🖼️" : "📄"}</span>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-navy">{mat.name}</p>
-                        <p className="text-xs text-muted">{mat.addedAt}</p>
+                        <p className="truncate text-sm font-medium text-navy">{mat.title}</p>
+                        <p className="text-xs text-muted">
+                          색인 {mat.chunk_count}조각{mat.page_count ? ` · ${mat.page_count}쪽` : ""}
+                          {mat.parse_mode === "demo_ai" ? " · 데모 추출" : ""}
+                        </p>
                       </div>
                     </div>
-                    <button type="button" className="ml-2 whitespace-nowrap rounded-full border border-line px-2.5 py-1 text-xs text-muted transition-colors hover:border-red-300 hover:text-red-500" onClick={() => setMaterials((prev) => prev.filter((m) => m.id !== mat.id))}>
+                    <button type="button" className="ml-2 whitespace-nowrap rounded-full border border-line px-2.5 py-1 text-xs text-muted transition-colors hover:border-red-300 hover:text-red-500" onClick={() => handleDeleteMaterial(mat.id)}>
                       삭제
                     </button>
                   </div>
