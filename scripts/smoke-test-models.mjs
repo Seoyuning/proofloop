@@ -22,7 +22,7 @@ try {
 const PROVIDERS = [
   { label: "LG EXAONE", key: env.FRIENDLI_API_KEY, baseUrl: env.FRIENDLI_BASE_URL || "https://api.friendli.ai/dedicated/v1", model: env.FRIENDLI_MODEL, extraBody: { chat_template_kwargs: { enable_thinking: false } } },
   { label: "Upstage Solar", key: env.UPSTAGE_API_KEY, baseUrl: env.UPSTAGE_BASE_URL || "https://api.upstage.ai/v1/solar", model: env.UPSTAGE_MODEL || "solar-pro" },
-  { label: "KT Mi:dm", key: env.KT_API_KEY, baseUrl: env.KT_BASE_URL || "https://api.friendli.ai/serverless/v1", model: env.KT_MODEL || "K-intelligence/Midm-2.0-Base-Instruct" },
+  { label: "KT Mi:dm", key: env.KT_API_KEY, baseUrl: env.KT_BASE_URL || "https://api.friendli.ai/dedicated/v1", model: env.KT_MODEL || "K-intelligence/Midm-2.0-Base-Instruct" },
   { label: "SKT A.X K1", key: env.SKT_API_KEY, baseUrl: env.SKT_BASE_URL || "https://api.platform.a.x/v1", model: env.SKT_MODEL || "ax-k1" },
 ];
 

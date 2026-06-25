@@ -74,7 +74,10 @@ function envFor(kind: ProviderKind): ProviderEnv | null {
       return {
         kind,
         apiKey,
-        baseUrl: process.env.KT_BASE_URL?.trim() || "https://api.friendli.ai/serverless/v1",
+        // KT Mi:dm은 EXAONE처럼 FriendliAI Dedicated로 제공(키 flp_, model=Endpoint ID dep...).
+        // base는 반드시 /dedicated/v1 (끝의 /v1 없으면 404).
+        baseUrl: process.env.KT_BASE_URL?.trim() || "https://api.friendli.ai/dedicated/v1",
+        // Dedicated에서 model은 배포된 Endpoint ID — 반드시 KT_MODEL로 지정
         model: process.env.KT_MODEL?.trim() || "K-intelligence/Midm-2.0-Base-Instruct",
       };
     }
